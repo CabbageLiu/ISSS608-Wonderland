@@ -1,0 +1,60 @@
+---
+title: "Hands-on_Exercise 1"
+author: "Liu Chih Yuan"
+---
+
+# Getting Started
+
+## **Install and launching R packages**
+
+The code chunk below uses p_load() of pacman package to check if tidyverse packages are installed in this computer. If they are, then they will be launched into R.
+
+*Pacman is like a package manager, Tidyverse are packages for data science eg. plotting, wrangling, cleaning, visualization etc*
+
+```{r}
+pacman::p_load(tidyverse)
+```
+
+## **Importing the data**
+
+*Note if you did not run the first code chunk tidyverse, this will indicate not found. read_csv is a code from tidyverse*
+
+Looks very much like what we are doing in Pandas pd.read()
+
+```{r}
+exam_data <- read_csv("data/Exam_data.csv")
+```
+
+# Ploting a simple bar chart
+
+If you want to show the code chunk only: add "#\| eval: false"
+
+If you want to show the plot only: add "#\| echo: false"
+
+**Down below is a example of showing plot only**
+
+*The best thing about R Markdown / Quarto is the ability to knit code + text + graph into full documents*
+
+"Kint" means taking .Rmd or .qmd file (with code chunks, text, and plots) and convert into a polished document like:
+
+1.  PDF
+
+2.  HTML website
+
+3.  Word documents
+
+4.  Slides / presentations
+
+```{r}
+#| echo: false
+ggplot(data = exam_data,
+       aes(x = RACE)) +
+  geom_bar()
+```
+
+Here is a code chunk that shows everything as default
+```{r}
+ggplot(data = exam_data,
+       aes(x = RACE)) +
+  geom_bar()
+```
