@@ -1,7 +1,19 @@
 ---
-title: "ISSS608-Wonderland"
+title: "ISSS608-Liu Chih Yuan"
 ---
 
 # **Welcome to Cabbage Wonderland** 🥬
 
+*by Liu Chih Yuan*
+
+This page is dedicated for documenting work exercises and notes for ISSS608 Visual Analytics
+
+<img src="images/cabbage.webp" width="500"/>
+
 *Fun Fact: Cabbages are veggies*
+
+## Latest Update:
+
+1.  Sidebar added
+2.  Navbar with github
+3.  Picture of cabbage

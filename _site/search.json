@@ -9,29 +9,75 @@
   {
     "objectID": "index.html",
     "href": "index.html",
-    "title": "ISSS608-Wonderland",
+    "title": "ISSS608-Liu Chih Yuan",
     "section": "",
-    "text": "Welcome to Cabbage Wonderland 🥬\nFun Fact: Cabbages are veggies"
+    "text": "by Liu Chih Yuan\nThis page is dedicated for documenting work exercises and notes for ISSS608 Visual Analytics\n\nFun Fact: Cabbages are veggies\n\n\n\nSidebar added\nNavbar with github\nPicture of cabbage"
   },
   {
     "objectID": "Hands-on_Ex/Hands-on_Ex01/Hands-on_Ex01.html",
     "href": "Hands-on_Ex/Hands-on_Ex01/Hands-on_Ex01.html",
     "title": "Hands-on_Exercise 1",
     "section": "",
-    "text": "The code chunk below uses p_load() of pacman package to check if tidyverse packages are installed in this computer. If they are, then they will be launched into R.\nPacman is like a package manager, Tidyverse are packages for data science eg. plotting, wrangling, cleaning, visualization etc\n\npacman::p_load(tidyverse)\n\n\n\n\nNote if you did not run the first code chunk tidyverse, this will indicate not found. read_csv is a code from tidyverse\nLooks very much like what we are doing in Pandas pd.read()\n\nexam_data &lt;- read_csv(\"data/Exam_data.csv\")\n\nRows: 322 Columns: 7\n── Column specification ────────────────────────────────────────────────────────\nDelimiter: \",\"\nchr (4): ID, CLASS, GENDER, RACE\ndbl (3): ENGLISH, MATHS, SCIENCE\n\nℹ Use `spec()` to retrieve the full column specification for this data.\nℹ Specify the column types or set `show_col_types = FALSE` to quiet this message."
+    "text": "The code chunk below uses p_load() of pacman package to check if tidyverse packages are installed in this computer. If they are, then they will be launched into R.\nPacman is like a package manager, Tidyverse are packages for data science eg. plotting, wrangling, cleaning, visualization etc\n\npacman::p_load(tidyverse)\n\n\n\n\nNote if you did not run the first code chunk tidyverse, this will indicate not found. read_csv is a code from tidyverse\nLooks very much like what we are doing in Pandas pd.read()\n\nexam_data &lt;- read_csv(\"data/Exam_data.csv\")\n\nRows: 322 Columns: 7\n── Column specification ────────────────────────────────────────────────────────\nDelimiter: \",\"\nchr (4): ID, CLASS, GENDER, RACE\ndbl (3): ENGLISH, MATHS, SCIENCE\n\nℹ Use `spec()` to retrieve the full column specification for this data.\nℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 1"
+    ]
   },
   {
     "objectID": "Hands-on_Ex/Hands-on_Ex01/Hands-on_Ex01.html#install-and-launching-r-packages",
     "href": "Hands-on_Ex/Hands-on_Ex01/Hands-on_Ex01.html#install-and-launching-r-packages",
     "title": "Hands-on_Exercise 1",
     "section": "",
-    "text": "The code chunk below uses p_load() of pacman package to check if tidyverse packages are installed in this computer. If they are, then they will be launched into R.\nPacman is like a package manager, Tidyverse are packages for data science eg. plotting, wrangling, cleaning, visualization etc\n\npacman::p_load(tidyverse)"
+    "text": "The code chunk below uses p_load() of pacman package to check if tidyverse packages are installed in this computer. If they are, then they will be launched into R.\nPacman is like a package manager, Tidyverse are packages for data science eg. plotting, wrangling, cleaning, visualization etc\n\npacman::p_load(tidyverse)",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 1"
+    ]
   },
   {
     "objectID": "Hands-on_Ex/Hands-on_Ex01/Hands-on_Ex01.html#importing-the-data",
     "href": "Hands-on_Ex/Hands-on_Ex01/Hands-on_Ex01.html#importing-the-data",
     "title": "Hands-on_Exercise 1",
     "section": "",
-    "text": "Note if you did not run the first code chunk tidyverse, this will indicate not found. read_csv is a code from tidyverse\nLooks very much like what we are doing in Pandas pd.read()\n\nexam_data &lt;- read_csv(\"data/Exam_data.csv\")\n\nRows: 322 Columns: 7\n── Column specification ────────────────────────────────────────────────────────\nDelimiter: \",\"\nchr (4): ID, CLASS, GENDER, RACE\ndbl (3): ENGLISH, MATHS, SCIENCE\n\nℹ Use `spec()` to retrieve the full column specification for this data.\nℹ Specify the column types or set `show_col_types = FALSE` to quiet this message."
+    "text": "Note if you did not run the first code chunk tidyverse, this will indicate not found. read_csv is a code from tidyverse\nLooks very much like what we are doing in Pandas pd.read()\n\nexam_data &lt;- read_csv(\"data/Exam_data.csv\")\n\nRows: 322 Columns: 7\n── Column specification ────────────────────────────────────────────────────────\nDelimiter: \",\"\nchr (4): ID, CLASS, GENDER, RACE\ndbl (3): ENGLISH, MATHS, SCIENCE\n\nℹ Use `spec()` to retrieve the full column specification for this data.\nℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 1"
+    ]
+  },
+  {
+    "objectID": "index.html#latest-update",
+    "href": "index.html#latest-update",
+    "title": "ISSS608-Liu Chih Yuan",
+    "section": "",
+    "text": "Sidebar added\nNavbar with github\nPicture of cabbage"
+  },
+  {
+    "objectID": "Session_notes/session_notes1.html",
+    "href": "Session_notes/session_notes1.html",
+    "title": "Session Note Week 1",
+    "section": "",
+    "text": "Session notes will be documenting the notes and learning points made during the hands-on exercise\n\n\n.qmd (Quarto Markdown): for content, dashboards\n.yml (Config/settings): metadata, layouts, options\nUse for maintain all the deliverables (eg. projects & exercise)\n\n\n\nWhen you make changes of your qmd / yml it will be first shown in git\nUsual changes: save (either qmd / yml) -&gt; render (note this changes locally only)\nTo upload to GitHub, we have to “push” the files\n\nPress Git on top right block\nSelect all files\nCommit and leave comment eg. commit after adding a cabbage image\nPress Push\nCheck on your GitHub see if uploaded\n\n\n\nPush Rejected: your local brand was “behind” the remote\n\nThis happens when:\n\nCreated a new repo on GitHub, it auto generates a README, LICENSE etc\nWhen you try to push without pulling those remote changer first\nLocal version doesn’t know about those remote commits so it says: do a git pull first to sync then can push\n\n\n\n\n\nHow Git Pull & Push works\n\nPull: download files from GitHub -&gt; your local\nPush: send files from local -&gt; GitHub\n\nHow to avoid this error\n\nDon’t initialize with README etc\nIf did so, always Pull before you Push",
+    "crumbs": [
+      "Home",
+      "Session Notes",
+      "Session 1"
+    ]
+  },
+  {
+    "objectID": "Session_notes/session_notes1.html#quarto",
+    "href": "Session_notes/session_notes1.html#quarto",
+    "title": "Session Note Week 1",
+    "section": "",
+    "text": ".qmd (Quarto Markdown): for content, dashboards\n.yml (Config/settings): metadata, layouts, options\nUse for maintain all the deliverables (eg. projects & exercise)\n\n\n\nWhen you make changes of your qmd / yml it will be first shown in git\nUsual changes: save (either qmd / yml) -&gt; render (note this changes locally only)\nTo upload to GitHub, we have to “push” the files\n\nPress Git on top right block\nSelect all files\nCommit and leave comment eg. commit after adding a cabbage image\nPress Push\nCheck on your GitHub see if uploaded\n\n\n\nPush Rejected: your local brand was “behind” the remote\n\nThis happens when:\n\nCreated a new repo on GitHub, it auto generates a README, LICENSE etc\nWhen you try to push without pulling those remote changer first\nLocal version doesn’t know about those remote commits so it says: do a git pull first to sync then can push\n\n\n\n\n\nHow Git Pull & Push works\n\nPull: download files from GitHub -&gt; your local\nPush: send files from local -&gt; GitHub\n\nHow to avoid this error\n\nDon’t initialize with README etc\nIf did so, always Pull before you Push",
+    "crumbs": [
+      "Home",
+      "Session Notes",
+      "Session 1"
+    ]
   }
 ]

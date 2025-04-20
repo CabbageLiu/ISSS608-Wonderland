@@ -2,17 +2,28 @@ project:
   type: website
 
 website:
-  title: "ISSS608-Wonderland"
+  title: "ISSS608-Liu Chih Yuan"
+  
   navbar:
-    left: 
-    - text: "Hands-on Exercise"
-      menu:
-        - text: "Hands-on Exercise 1"
-          href: "Hands-on_Ex/Hands-on_Ex01/Hands-on_Ex01.html"
-    right: 
+    left:
       - href: index.qmd
         text: Home
       - about.qmd
+    right:
+      - icon: github
+        href: https://github.com/CabbageLiu
+        
+  sidebar:        # ← change from `navbar:` to `sidebar:`
+    style: "floating"
+    contents:
+      - section: "Hands-on Exercise"
+        contents:
+          - text: "Exercise 1"
+            href: Hands-on_Ex/Hands-on_Ex01/Hands-on_Ex01.qmd
+      - section: "Session Notes"
+        contents:
+          - text: "Session 1"
+            href: Session_notes/session_notes1.qmd
 
 format:
   html:

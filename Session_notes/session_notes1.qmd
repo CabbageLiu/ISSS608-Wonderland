@@ -1,0 +1,51 @@
+---
+title: "Session Note Week 1"
+---
+
+# Notes:
+
+Session notes will be documenting the notes and learning points made during the hands-on exercise
+
+## 1. Quarto
+
+.qmd (Quarto Markdown): for content, dashboards
+
+.yml (Config/settings): metadata, layouts, options
+
+Use for maintain all the deliverables (eg. projects & exercise)
+
+### 1.1 Making Changes (Local & to GitHub)
+
+-   When you make changes of your qmd / yml it will be first shown in git
+
+-   Usual changes: save (either qmd / yml) -\> render *(note this changes locally only)*
+
+-   To upload to GitHub, we have to "push" the files
+
+    1.  Press Git on top right block
+    2.  Select all files
+    3.  Commit and leave comment *eg. commit after adding a cabbage image*
+    4.  Press Push
+    5.  Check on your GitHub see if uploaded
+
+    #### **Error encountered:**
+
+    -   Push Rejected: your local brand was "behind" the remote
+
+        -   This happens when:
+
+            1.  Created a new repo on GitHub, it auto generates a README, LICENSE etc
+            2.  When you try to push without pulling those remote changer first
+            3.  Local version doesn't know about those remote commits so it says: do a git pull first to sync then can push
+
+    #### **Learning Points:**
+
+    -   How Git Pull & Push works
+
+        1.  Pull: download files from GitHub -\> your local
+        2.  Push: send files from local -\> GitHub
+
+    -   How to avoid this error
+
+        1.  Don't initialize with README etc
+        2.  If did so, always **Pull** before you **Push**
