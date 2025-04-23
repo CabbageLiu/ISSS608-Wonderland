@@ -1,1 +1,10 @@
-/* css styles */
+/* Reduce space around code and plots */
+.cell-output, .cell-code, pre {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+/* Reduce paragraph spacing */
+p {
+  margin: 0.7em 0;
+}

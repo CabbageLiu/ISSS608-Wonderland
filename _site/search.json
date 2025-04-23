@@ -79,5 +79,89 @@
       "Session Notes",
       "Session 1"
     ]
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html",
+    "href": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html",
+    "title": "Hands-on_Ex02",
+    "section": "",
+    "text": "ggplot2 extensions for better statistical graphs\n\n\n\n\npacman::p_load(ggrepel, patchwork, \n               ggthemes, hrbrthemes,\n               tidyverse) \n\n\n\n\n\nexam_data &lt;- read_csv(\"data/Exam_data.csv\")\n\nRows: 322 Columns: 7\n── Column specification ────────────────────────────────────────────────────────\nDelimiter: \",\"\nchr (4): ID, CLASS, GENDER, RACE\ndbl (3): ENGLISH, MATHS, SCIENCE\n\nℹ Use `spec()` to retrieve the full column specification for this data.\nℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.\n\n\n*always remember to load package first or else won’t execute properly! Here we can see the dataset consists of: 1. Categorical attributes: ID, CLASS, GENDER, RACE 2. Continuous attributes: MATHS, ENGLISH, SCIENCE\n\n\n\n\n\n\nggplot(data=exam_data, \n       aes(x= MATHS, \n           y=ENGLISH)) +\n  geom_point() +\n  geom_smooth(method=lm, \n              size=0.5) +  \n  geom_label(aes(label = ID), \n             hjust = .5, \n             vjust = -.5) +\n  coord_cartesian(xlim=c(0,100),\n                  ylim=c(0,100)) +\n  ggtitle(\"English scores versus Maths scores for Primary 3\")\n\nWarning: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.\nℹ Please use `linewidth` instead.\n\n\n`geom_smooth()` using formula = 'y ~ x'\n\n\n\n\n\n\n\n\n\nWhen plotting large datasets, annotation tends to become quite tedious as shown on the graph above\n\n\n\n\nggrepel is an extension of ggplot2 to repel overlapping texts\nSimply replace geom_text() with geom_text_repel() and geom_label() with geom_label_repel() as shown below\n\n\nggplot(data=exam_data, \n       aes(x= MATHS, \n           y=ENGLISH)) +\n  geom_point() +\n  geom_smooth(method=lm, \n              size=0.5) +  \n  geom_label_repel(aes(label = ID), \n                   fontface = \"bold\") +\n  coord_cartesian(xlim=c(0,100),\n                  ylim=c(0,100)) +\n  ggtitle(\"English scores versus Maths scores for Primary 3\")\n\n`geom_smooth()` using formula = 'y ~ x'\n\n\nWarning: ggrepel: 317 unlabeled data points (too many overlaps). Consider\nincreasing max.overlaps\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nKey Takeaways: ggthemes vs hrbrthemes\n\n\n\n\nggthemes provides preset themes that mimic well-known publications like The Economist, WSJ, etc.\nIt’s great for quickly applying a distinct professional style to your plots.\nhrbrthemes focuses on typography and readability, using carefully chosen fonts, spacing, and alignment.\nBest for presentation-quality plots with clean and modern text aesthetics.\n\n\n\nggplot2 comes with 8 themes pre-installed in the package, theme_gray(), theme_bw(), theme_classic(), theme_dark(), theme_light(), theme_linedraw(), theme_minimal(), and theme_void()\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  theme_gray() +\n  ggtitle(\"Distribution of Maths scores\") \n\n\n\n\n\n\n\n\nNothing wrong with this, but we can make it more interesting\n\n\nggtheme consists of themes replicating the plots by Edward Tufte, Stephen Few, Fivethirtyeight, The Economist, Stata, Excel, and The Wall Street Journal Here are some showcases: #### The Economist\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  ggtitle(\"Distribution of Maths scores\") +\n  theme_economist()\n\n\n\n\n\n\n\n\n\n\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  ggtitle(\"Distribution of Maths scores\") +\n  theme_stata()\n\n\n\n\n\n\n\n\n\n\n\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  ggtitle(\"Distribution of Maths scores\") +\n  theme_wsj()\n\n\n\n\n\n\n\n\n\n\n\n\nhrbthems extension provides base theme that focuses on typographic elements, including where various labels are placed as well as the fonts that are used.\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  ggtitle(\"Distribution of Maths scores\") +\n  theme_ipsum()\n\n\n\n\n\n\n\n\nWe can also change the font size of the titles\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  ggtitle(\"Distribution of Maths scores\") +\n  theme_ipsum(axis_title_size = 18,\n              base_size = 15,\n              grid = \"Y\")\n\n\n\n\n\n\n\n\nChanges made:\n1. axis_title_size used to increase font size of axis title to 18\n2. base_size used to increase the default axis to 15\n3. grid used to remove the x-axis grid lines\n\n\n\n\nIt is commonly seen in real world use cases that we have to combine multiple graphs to tell a compelling visual story. Here we create 3 statistical graphs first\n\np1 &lt;- ggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") + \n  coord_cartesian(xlim=c(0,100)) +\n  ggtitle(\"Distribution of Maths scores\")\n\n\np2 &lt;- ggplot(data=exam_data, \n             aes(x = ENGLISH)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  coord_cartesian(xlim=c(0,100)) +\n  ggtitle(\"Distribution of English scores\")\n\nLastly, we create scatterplot for English score vs Math score\n\np3 &lt;- ggplot(data=exam_data, \n             aes(x= MATHS, \n                 y=ENGLISH)) +\n  geom_point() +\n  geom_smooth(method=lm, \n              size=0.5) +  \n  coord_cartesian(xlim=c(0,100),\n                  ylim=c(0,100)) +\n  ggtitle(\"English scores versus Maths scores for Primary 3\")\n\n\n\npatchwork is designed for combining separate ggplot2 graphs into single figure\n\n\n\n\n\n\nPatchwork Layout Syntax Cheatsheet\n\n\n\n\nUse + for a two-column layout (side by side).\nUse () to create a subplot group.\nUse / for a two-row layout (stacked vertically).\n\n\nPatchwork makes arranging ggplots intuitive with simple math-like syntax. :::\n\n\n\n\n\n*refer back to the 3 graphs we have labelled them as p1 p2 p3\nTo combine simply ‘p1 + p2’\n\np1 + p2\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPatchwork Composite Plot Operators\n\n\n\n\nUse / to stack two ggplot2 graphs vertically.\nUse | to place plots side by side.\nUse () to group plots and control the sequence of layout.\n\n\nCombine these operators to build complex composite figures easily with the patchwork package.\n\n\n\n\n(p1 / p2) | p3\n\n`geom_smooth()` using formula = 'y ~ x'\n\n\n\n\n\n\n\n\n\n\n\n\n\n((p1 / p2) | p3) + \n  plot_annotation(tag_levels = 'I')\n\n`geom_smooth()` using formula = 'y ~ x'\n\n\n\n\n\n\n\n\n\n\n\n\nWith insert_element() of pathwork, we can place graphs within a plot\n\np3 + inset_element(p2, \n                   left = 0.02, \n                   bottom = 0.7, \n                   right = 0.5, \n                   top = 1)\n\n`geom_smooth()` using formula = 'y ~ x'\n\n\n\n\n\n\n\n\n\n\n\n\nHere we composite 3 graphs together and use The Economist theme\n\npatchwork &lt;- (p1 / p2) | p3\npatchwork & theme_economist()\n\n`geom_smooth()` using formula = 'y ~ x'",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 2"
+    ]
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#objective",
+    "href": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#objective",
+    "title": "Hands-on_Ex02",
+    "section": "",
+    "text": "ggplot2 extensions for better statistical graphs",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 2"
+    ]
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#loading-the-packages",
+    "href": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#loading-the-packages",
+    "title": "Hands-on_Ex02",
+    "section": "",
+    "text": "pacman::p_load(ggrepel, patchwork, \n               ggthemes, hrbrthemes,\n               tidyverse)",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 2"
+    ]
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#reading-the-csv-file",
+    "href": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#reading-the-csv-file",
+    "title": "Hands-on_Ex02",
+    "section": "",
+    "text": "exam_data &lt;- read_csv(\"data/Exam_data.csv\")\n\nRows: 322 Columns: 7\n── Column specification ────────────────────────────────────────────────────────\nDelimiter: \",\"\nchr (4): ID, CLASS, GENDER, RACE\ndbl (3): ENGLISH, MATHS, SCIENCE\n\nℹ Use `spec()` to retrieve the full column specification for this data.\nℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.\n\n\n*always remember to load package first or else won’t execute properly! Here we can see the dataset consists of: 1. Categorical attributes: ID, CLASS, GENDER, RACE 2. Continuous attributes: MATHS, ENGLISH, SCIENCE",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 2"
+    ]
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#ggrepel-annotation",
+    "href": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#ggrepel-annotation",
+    "title": "Hands-on_Ex02",
+    "section": "",
+    "text": "ggplot(data=exam_data, \n       aes(x= MATHS, \n           y=ENGLISH)) +\n  geom_point() +\n  geom_smooth(method=lm, \n              size=0.5) +  \n  geom_label(aes(label = ID), \n             hjust = .5, \n             vjust = -.5) +\n  coord_cartesian(xlim=c(0,100),\n                  ylim=c(0,100)) +\n  ggtitle(\"English scores versus Maths scores for Primary 3\")\n\nWarning: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.\nℹ Please use `linewidth` instead.\n\n\n`geom_smooth()` using formula = 'y ~ x'\n\n\n\n\n\n\n\n\n\nWhen plotting large datasets, annotation tends to become quite tedious as shown on the graph above\n\n\n\n\nggrepel is an extension of ggplot2 to repel overlapping texts\nSimply replace geom_text() with geom_text_repel() and geom_label() with geom_label_repel() as shown below\n\n\nggplot(data=exam_data, \n       aes(x= MATHS, \n           y=ENGLISH)) +\n  geom_point() +\n  geom_smooth(method=lm, \n              size=0.5) +  \n  geom_label_repel(aes(label = ID), \n                   fontface = \"bold\") +\n  coord_cartesian(xlim=c(0,100),\n                  ylim=c(0,100)) +\n  ggtitle(\"English scores versus Maths scores for Primary 3\")\n\n`geom_smooth()` using formula = 'y ~ x'\n\n\nWarning: ggrepel: 317 unlabeled data points (too many overlaps). Consider\nincreasing max.overlaps",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 2"
+    ]
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#ggthemes-hrbthems-themes",
+    "href": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#ggthemes-hrbthems-themes",
+    "title": "Hands-on_Ex02",
+    "section": "",
+    "text": "Key Takeaways: ggthemes vs hrbrthemes\n\n\n\n\nggthemes provides preset themes that mimic well-known publications like The Economist, WSJ, etc.\nIt’s great for quickly applying a distinct professional style to your plots.\nhrbrthemes focuses on typography and readability, using carefully chosen fonts, spacing, and alignment.\nBest for presentation-quality plots with clean and modern text aesthetics.\n\n\n\nggplot2 comes with 8 themes pre-installed in the package, theme_gray(), theme_bw(), theme_classic(), theme_dark(), theme_light(), theme_linedraw(), theme_minimal(), and theme_void()\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  theme_gray() +\n  ggtitle(\"Distribution of Maths scores\") \n\n\n\n\n\n\n\n\nNothing wrong with this, but we can make it more interesting\n\n\nggtheme consists of themes replicating the plots by Edward Tufte, Stephen Few, Fivethirtyeight, The Economist, Stata, Excel, and The Wall Street Journal Here are some showcases: #### The Economist\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  ggtitle(\"Distribution of Maths scores\") +\n  theme_economist()\n\n\n\n\n\n\n\n\n\n\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  ggtitle(\"Distribution of Maths scores\") +\n  theme_stata()\n\n\n\n\n\n\n\n\n\n\n\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  ggtitle(\"Distribution of Maths scores\") +\n  theme_wsj()\n\n\n\n\n\n\n\n\n\n\n\n\nhrbthems extension provides base theme that focuses on typographic elements, including where various labels are placed as well as the fonts that are used.\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  ggtitle(\"Distribution of Maths scores\") +\n  theme_ipsum()\n\n\n\n\n\n\n\n\nWe can also change the font size of the titles\n\nggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  ggtitle(\"Distribution of Maths scores\") +\n  theme_ipsum(axis_title_size = 18,\n              base_size = 15,\n              grid = \"Y\")\n\n\n\n\n\n\n\n\nChanges made:\n1. axis_title_size used to increase font size of axis title to 18\n2. base_size used to increase the default axis to 15\n3. grid used to remove the x-axis grid lines",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 2"
+    ]
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#composing-with-multiple-graphs",
+    "href": "Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.html#composing-with-multiple-graphs",
+    "title": "Hands-on_Ex02",
+    "section": "",
+    "text": "It is commonly seen in real world use cases that we have to combine multiple graphs to tell a compelling visual story. Here we create 3 statistical graphs first\n\np1 &lt;- ggplot(data=exam_data, \n             aes(x = MATHS)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") + \n  coord_cartesian(xlim=c(0,100)) +\n  ggtitle(\"Distribution of Maths scores\")\n\n\np2 &lt;- ggplot(data=exam_data, \n             aes(x = ENGLISH)) +\n  geom_histogram(bins=20, \n                 boundary = 100,\n                 color=\"grey25\", \n                 fill=\"grey90\") +\n  coord_cartesian(xlim=c(0,100)) +\n  ggtitle(\"Distribution of English scores\")\n\nLastly, we create scatterplot for English score vs Math score\n\np3 &lt;- ggplot(data=exam_data, \n             aes(x= MATHS, \n                 y=ENGLISH)) +\n  geom_point() +\n  geom_smooth(method=lm, \n              size=0.5) +  \n  coord_cartesian(xlim=c(0,100),\n                  ylim=c(0,100)) +\n  ggtitle(\"English scores versus Maths scores for Primary 3\")\n\n\n\npatchwork is designed for combining separate ggplot2 graphs into single figure\n\n\n\n\n\n\nPatchwork Layout Syntax Cheatsheet\n\n\n\n\nUse + for a two-column layout (side by side).\nUse () to create a subplot group.\nUse / for a two-row layout (stacked vertically).\n\n\nPatchwork makes arranging ggplots intuitive with simple math-like syntax. :::\n\n\n\n\n\n*refer back to the 3 graphs we have labelled them as p1 p2 p3\nTo combine simply ‘p1 + p2’\n\np1 + p2\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPatchwork Composite Plot Operators\n\n\n\n\nUse / to stack two ggplot2 graphs vertically.\nUse | to place plots side by side.\nUse () to group plots and control the sequence of layout.\n\n\nCombine these operators to build complex composite figures easily with the patchwork package.\n\n\n\n\n(p1 / p2) | p3\n\n`geom_smooth()` using formula = 'y ~ x'\n\n\n\n\n\n\n\n\n\n\n\n\n\n((p1 / p2) | p3) + \n  plot_annotation(tag_levels = 'I')\n\n`geom_smooth()` using formula = 'y ~ x'\n\n\n\n\n\n\n\n\n\n\n\n\nWith insert_element() of pathwork, we can place graphs within a plot\n\np3 + inset_element(p2, \n                   left = 0.02, \n                   bottom = 0.7, \n                   right = 0.5, \n                   top = 1)\n\n`geom_smooth()` using formula = 'y ~ x'\n\n\n\n\n\n\n\n\n\n\n\n\nHere we composite 3 graphs together and use The Economist theme\n\npatchwork &lt;- (p1 / p2) | p3\npatchwork & theme_economist()\n\n`geom_smooth()` using formula = 'y ~ x'",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 2"
+    ]
   }
 ]

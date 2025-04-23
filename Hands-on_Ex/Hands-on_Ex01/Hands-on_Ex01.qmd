@@ -53,6 +53,7 @@ ggplot(data = exam_data,
 ```
 
 Here is a code chunk that shows everything as default
+
 ```{r}
 ggplot(data = exam_data,
        aes(x = RACE)) +
