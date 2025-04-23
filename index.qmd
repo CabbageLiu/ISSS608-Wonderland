@@ -14,6 +14,4 @@ This page is dedicated for documenting work exercises and notes for ISSS608 Visu
 
 ## Latest Update:
 
-1.  Sidebar added
-2.  Navbar with github
-3.  Picture of cabbage
+1.  Hands-on_Ex02 added
