@@ -9,9 +9,6 @@ website:
       - href: index.qmd
         text: Home
       - about.qmd
-    right:
-      - icon: github
-        href: https://github.com/CabbageLiu
         
   sidebar:        # ← change from `navbar:` to `sidebar:`
     style: "floating"
@@ -29,7 +26,7 @@ website:
 
 format:
   html:
-    theme: minty
+    theme: darkly
     css: styles.css
     toc: true
 

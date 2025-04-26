@@ -18,7 +18,7 @@ execute:
 
 This page is dedicated for documenting work exercises and notes for ISSS608 Visual Analytics
 
-<img src="images/cabbage.webp" width="500"/>
+<img src="images/cabbageGPT.png" width="500"/>
 
 *Fun Fact: Cabbages are veggies*
 
