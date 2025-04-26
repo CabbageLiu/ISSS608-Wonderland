@@ -270,6 +270,9 @@ p3 + inset_element(p2,
 Here we composite 3 graphs together and use The Economist theme
 
 ```{r}
+#| echo: false
+#| fig-width: 14
+#| fig-height:  7
 patchwork <- (p1 / p2) | p3
 patchwork & theme_economist()
 ```
