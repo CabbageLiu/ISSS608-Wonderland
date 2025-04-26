@@ -1,5 +1,15 @@
 ---
 title: "ISSS608-Liu Chih Yuan"
+description: ""
+date: "April 26, 2025"
+date-modified: "last-modified"
+format: html
+editor: visual
+execute: 
+  eval: true        # run code 
+  echo: true         # show code 
+  warning: false     #warning msg wont come out
+  freeze: true      #speed up rendering time
 ---
 
 # **Welcome to Cabbage Wonderland** 🥬
