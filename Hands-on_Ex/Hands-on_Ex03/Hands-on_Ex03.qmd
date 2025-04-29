@@ -1,0 +1,375 @@
+---
+title: "Hands-on_Ex03"
+author: "Liu Chih Yuan"
+date: "April 29, 2025"
+date-modified: "last-modified"
+---
+
+# Programming Interactive Data Visualization with R
+
+## Loading the packages
+
+1.  `ggiraph` making 'ggplot graphics interactive
+2.  `plotly` library for plotting interactive statistical graphs
+3.  `DT` R interface to the JavaScript library
+4.  `DataTables` create interactive table on html page
+5.  `tidyverse` set of modern R packages for support data science, analysis and communication task *eg. create static statistical graphs*
+6.  `patchwork` for combining multiple ggplot2 graphs into one figure
+
+```{r}
+pacman::p_load(ggiraph, plotly, patchwork, DT, tidyverse)
+```
+
+## Importing the data
+
+```{r}
+exam_data <- read_csv("data/Exam_data.csv")
+```
+
+## Interactive Data Visualization - `ggiraph` methods
+
+`ggiraph` is an `htmlwidget` and a `ggplot2` extension, allowing graphs to be interactive
+
+The main three elements:
+
+1.  **Tooltip:** when hover over data with mouse, displays info
+2.  **Onclick:** column of dataset contain a JavaScript function to be executed when clicked
+3.  **Data_id:** column of dataset contain an id to be associated with elements
+
+### Tooltip effect with *tooltip* aesthetic
+
+```{r}
+p <- ggplot(data=exam_data, 
+       aes(x = MATHS)) +
+  geom_dotplot_interactive(
+    aes(tooltip = ID),
+    stackgroups = TRUE, 
+    binwidth = 1, 
+    method = "histodot") +
+  scale_y_continuous(NULL, 
+                     breaks = NULL)
+girafe(
+  ggobj = p,
+  width_svg = 6,
+  height_svg = 6*0.618
+)
+```
+
+By hovering over the data points displays which student it is
+
+```{r}
+exam_data$tooltip <- c(paste0(     
+  "Name = ", exam_data$ID,         
+  "\n Class = ", exam_data$CLASS)) 
+
+p <- ggplot(data=exam_data, 
+       aes(x = MATHS)) +
+  geom_dotplot_interactive(
+    aes(tooltip = exam_data$tooltip), 
+    stackgroups = TRUE,
+    binwidth = 1,
+    method = "histodot") +
+  scale_y_continuous(NULL,               
+                     breaks = NULL)
+girafe(
+  ggobj = p,
+  width_svg = 8,
+  height_svg = 8*0.618
+)
+```
+
+We can also choose to display more data, the first 3 line of code create a new field called *tooltip* and reused on code line 7
+
+### Customize Tooltip Style
+
+```{r}
+exam_data$tooltip <- c(paste0(     
+  "Name = ", exam_data$ID,         
+  "\n Class = ", exam_data$CLASS)) 
+
+tooltip_css <- "background-color:white; #<<
+font-style:bold; color:black;" #<<
+
+p <- ggplot(data=exam_data, 
+       aes(x = MATHS)) +
+  geom_dotplot_interactive(
+    aes(tooltip = exam_data$tooltip), 
+    stackgroups = TRUE,
+    binwidth = 1,
+    method = "histodot") +
+  scale_y_continuous(NULL,               
+                     breaks = NULL)
+girafe(
+  ggobj = p,
+  width_svg = 8,
+  height_svg = 8*0.618,
+  options = list(    #<<
+    opts_tooltip(    #<<
+      css = tooltip_css)) #<<
+)
+```
+
+### Displaying statistics on tooltip
+
+```{r}
+tooltip <- function(y, ymax, accuracy = .01) {
+  mean <- scales::number(y, accuracy = accuracy)
+  sem <- scales::number(ymax - y, accuracy = accuracy)
+  paste("Mean maths scores:", mean, "+/-", sem)
+}
+
+gg_point <- ggplot(data=exam_data, 
+                   aes(x = RACE),
+) +
+  stat_summary(aes(y = MATHS, 
+                   tooltip = after_stat(  
+                     tooltip(y, ymax))),  
+    fun.data = "mean_se", 
+    geom = GeomInteractiveCol,  
+    fill = "light blue"
+  ) +
+  stat_summary(aes(y = MATHS),
+    fun.data = mean_se,
+    geom = "errorbar", width = 0.2, size = 0.2
+  )
+
+girafe(ggobj = gg_point,
+       width_svg = 8,
+       height_svg = 8*0.618)
+    
+```
+
+### Hover effect with *data_id* aesthetic
+
+This is the second interactive feature of `ggiraph`: `data_id`
+
+```{r}
+p <- ggplot(data=exam_data, 
+       aes(x = MATHS)) +
+  geom_dotplot_interactive(           
+    aes(data_id = CLASS),             
+    stackgroups = TRUE,               
+    binwidth = 1,                        
+    method = "histodot") +               
+  scale_y_continuous(NULL,               
+                     breaks = NULL)
+girafe(                                  
+  ggobj = p,                             
+  width_svg = 6,                         
+  height_svg = 6*0.618
+)                                        
+```
+
+Note that the default value (color) of the hover css is `hover_css = "fill:orange"`
+
+### Styling hover effect
+
+```{r}
+p <- ggplot(data=exam_data, 
+       aes(x = MATHS)) +
+  geom_dotplot_interactive(              
+    aes(data_id = CLASS),              
+    stackgroups = TRUE,                  
+    binwidth = 1,                        
+    method = "histodot") +               
+  scale_y_continuous(NULL,               
+                     breaks = NULL)
+girafe(                                  
+  ggobj = p,                             
+  width_svg = 6,                         
+  height_svg = 6*0.618,
+  options = list(                        
+    opts_hover(css = "fill: #202020;"),  
+    opts_hover_inv(css = "opacity:0.2;") 
+  )                                        
+)                                        
+```
+
+### Combining tooltip and hover effect
+
+```{r}
+p <- ggplot(data=exam_data, 
+       aes(x = MATHS)) +
+  geom_dotplot_interactive(              
+    aes(tooltip = CLASS, 
+        data_id = CLASS),              
+    stackgroups = TRUE,                  
+    binwidth = 1,                        
+    method = "histodot") +               
+  scale_y_continuous(NULL,               
+                     breaks = NULL)
+girafe(                                  
+  ggobj = p,                             
+  width_svg = 6,                         
+  height_svg = 6*0.618,
+  options = list(                        
+    opts_hover(css = "fill: #202020;"),  
+    opts_hover_inv(css = "opacity:0.2;") 
+  )                                        
+)                                        
+```
+
+### Click effect with on-click
+
+Bascially goes to the URL when click
+
+```{r}
+exam_data$onclick <- sprintf("window.open(\"%s%s\")",
+"https://www.moe.gov.sg/schoolfinder?journey=Primary%20school",
+as.character(exam_data$ID))
+
+p <- ggplot(data=exam_data, 
+       aes(x = MATHS)) +
+  geom_dotplot_interactive(              
+    aes(onclick = onclick),              
+    stackgroups = TRUE,                  
+    binwidth = 1,                        
+    method = "histodot") +               
+  scale_y_continuous(NULL,               
+                     breaks = NULL)
+girafe(                                  
+  ggobj = p,                             
+  width_svg = 6,                         
+  height_svg = 6*0.618)                                        
+```
+
+### Coordinated Multiple Views with `ggirpah`
+
+We can also link up graphs to provide a holistic view of how the data interact
+
+```{r}
+p1 <- ggplot(data=exam_data, 
+       aes(x = MATHS)) +
+  geom_dotplot_interactive(              
+    aes(data_id = ID),              
+    stackgroups = TRUE,                  
+    binwidth = 1,                        
+    method = "histodot") +  
+  coord_cartesian(xlim=c(0,100)) + 
+  scale_y_continuous(NULL,               
+                     breaks = NULL)
+
+p2 <- ggplot(data=exam_data, 
+       aes(x = ENGLISH)) +
+  geom_dotplot_interactive(              
+    aes(data_id = ID),              
+    stackgroups = TRUE,                  
+    binwidth = 1,                        
+    method = "histodot") + 
+  coord_cartesian(xlim=c(0,100)) + 
+  scale_y_continuous(NULL,               
+                     breaks = NULL)
+
+girafe(code = print(p1 + p2), 
+       width_svg = 6,
+       height_svg = 3,
+       options = list(
+         opts_hover(css = "fill: #202020;"),
+         opts_hover_inv(css = "opacity:0.2;")
+         )
+       ) 
+
+```
+
+## Interactive Data Visualization = `plotly` method
+
+Plotly's R graphing library create interactive web graphics from **ggplot2** graphs and custom interface to the (MIT-licensed) JavaScript library **plotly.js**
+
+There are 2 ways to create interactive graph by using `plotly`:
+
+1.  using `plot_ly()`
+2.  using `ggplotly()`
+
+### The `plot_ly()` method
+
+```{r}
+plot_ly(data = exam_data,
+             x = ~MATHS,
+             y = ~ENGLISH)
+```
+
+### Adding color for better differentiation
+
+```{r}
+plot_ly(data = exam_data,
+             x = ~ENGLISH,
+             y= ~MATHS,
+             color = ~RACE)
+```
+
+### The `ggplotly()` method
+
+```{r}
+p <- ggplot(data=exam_data,
+            aes(x = MATHS,
+                y = ENGLISH)) +
+  geom_point(size=1) +
+  coord_cartesian(xlim=c(0,100),
+                  ylim=c(0,100))
+ggplotly(p)
+```
+
+### Coordinated Multiple Views with `plotly()`
+
+Three steps:
+
+1.  `highlight_key()` of `plotly` package is used to share data
+2.  two scatterplots created by using `ggplot2` functions
+3.  `subplot()` of `plotly` is used to place them side-by-side
+
+```{r}
+d <- highlight_key(exam_data)
+p1 <- ggplot(data=d, 
+            aes(x = MATHS,
+                y = ENGLISH)) +
+  geom_point(size=1) +
+  coord_cartesian(xlim=c(0,100),
+                  ylim=c(0,100))
+
+p2 <- ggplot(data=d, 
+            aes(x = MATHS,
+                y = SCIENCE)) +
+  geom_point(size=1) +
+  coord_cartesian(xlim=c(0,100),
+                  ylim=c(0,100))
+subplot(ggplotly(p1),
+        ggplotly(p2))
+
+```
+
+## `crosstalk` method
+
+`crosstalk` is an add-on to the htmlwidgets package, with set of classes, functions, and conventions for implementing cross-widget interactions (currently, linked brushing and filtering)
+
+### DT package
+
+DT package is a wrapper of the JavaScript Library `DataTables`
+
+Data objects in R can be rendered as HTML tables using the JS library `DataTables` (usually via R Markdown or Shiny)
+
+```{r}
+DT::datatable(exam_data, class = "compact")
+```
+
+### Linked brushing: crosstalk method
+
+```{r}
+d <- highlight_key(exam_data) 
+p <- ggplot(d, 
+            aes(ENGLISH, 
+                MATHS)) + 
+  geom_point(size=1) +
+  coord_cartesian(xlim=c(0,100),
+                  ylim=c(0,100))
+
+gg <- highlight(ggplotly(p),        
+                "plotly_selected")  
+
+crosstalk::bscols(gg,               
+                  DT::datatable(d), 
+                  widths = 5)        
+```
+
+`highlight()` is a function of `plotly` which sets a variety of options for brushing
+
+`bscols()` is a helper function of `crosstalk` package, making it easy to put HTML elements side by side

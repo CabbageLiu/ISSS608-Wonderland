@@ -9,11 +9,6 @@ p {
   margin: 0.7em 0;
 }
 
-/* Change navbar to green */
-.navbar {
-  background-color: #2e7d32; /* A nice dark green */
-}
-
 /* Optional: ensure navbar text is readable */
 .navbar a,
 .navbar-brand {
