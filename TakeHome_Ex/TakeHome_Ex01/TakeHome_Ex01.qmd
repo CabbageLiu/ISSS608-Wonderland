@@ -1,0 +1,211 @@
+---
+title: "Take-Home Exercise 1"
+author: "Liu Chih Yuan"
+date: "April 29, 2025"
+date-modified: "last-modified"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Exploratory Analysis of Age and Gender Distribution Across Singapore Planning Areas (2024)
+
+## 1. Overview
+
+The 2024 dataset from Singapore' Department of Statistics provides resident population data by planning area, subzone, age, and sex.
+
+### 1.1 Objective
+
+To perform structured exploratory data analysis to uncover insights on demographic distribution across regions.
+
+## 2. Getting Started
+
+### 2.1 Load Packages
+
+```{r}
+pacman::p_load(tidyverse, ggrepel, ggthemes, patchwork, ggridges, scales)
+```
+
+The R packages used in this EDA are as follows:
+
+1.  `tidyverse` core R package for data science (contains essential packages such as ggplot2)
+2.  `ggrepel` for ggplot2 to repel overlapping text labels
+3.  `ggthemes` extra ggplot themes
+4.  `patchwork` combine ggplot
+5.  `ggridges` for ridgeline plots
+6.  `scales` customer number formatting
+
+### 2.2 Import Data
+
+```{r}
+df <- read.csv("data/respopagesex2024.csv")
+```
+
+```{r}
+common_theme <- theme_minimal(base_size = 16) +
+  theme(
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 20),
+    plot.title = element_text(size = 18, face = "bold"),
+    legend.text = element_text(size = 17),
+    legend.title = element_text(size = 16)
+  )
+```
+
+#### 2.2.1 Check Missing Values
+
+```{r}
+glimpse(df)
+colSums(is.na(df))
+```
+
+### 2.3 Data Processing
+
+#### 2.3.1 Checking Column Types
+
+```{r}
+str(df)
+```
+
+We see column `Age` is "chr" (character) instead of numeric, let's check why by finding the unique value of column `Age`
+
+```{r}
+sort(unique(df$Age))
+```
+
+Here most likely it's the `90_and_over` causing it to be a `str` not `int`
+
+#### 2.3.2 Creating a Numeric Age Column
+
+```{r}
+df <- df %>%
+  mutate(
+    AgeNum = suppressWarnings(
+      ifelse(Age == "90_and_Over", 90, as.numeric(Age))
+    )
+  )
+```
+
+Since we observed people over 90 years old are categorized `90_and_above` instead of actual numbers, for the ease of plotting we hereby create a new column `AgeNum`
+
+#### 2.3.3 Creating Age Grouping
+
+```{r}
+df <- df %>%
+  mutate(
+    AgeGroup = case_when(
+      AgeNum <= 12 ~ "Child",
+      AgeNum <= 24 ~ "Youth",
+      AgeNum <= 64 ~ "Adult",
+      TRUE ~ "Senior"
+    )
+  )
+```
+
+We create a new column `AgeGroup` for future EDA purposes
+
+```{r}
+str(df)
+```
+
+```{r}
+common_theme <- theme_minimal(base_size = 14) +
+  theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold")
+  )
+```
+
+## 3. Exploratory Data Analysis
+
+### EDA 1: Population by Age / Age Group
+
+```{r fig.height=8, fig.width=10}
+p1 <- ggplot(df, aes(x = AgeNum, y = Pop)) +
+  stat_summary(fun = sum, geom = "bar", fill = "steelblue") +
+  labs(title = "Total Population by Age", x = "Age", y = "Population") +
+  scale_y_continuous(labels = label_comma()) +
+  common_theme
+
+p2 <- df %>%
+  group_by(AgeGroup) %>%
+  summarise(Pop = sum(Pop)) %>%
+  ggplot(aes(x = AgeGroup, y = Pop, fill = AgeGroup)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Population by Age Group", y = "Population") +
+  scale_y_continuous(labels = label_comma()) +
+  common_theme
+
+(p1 / p2) + plot_layout(heights = c(1.2, 1))
+```
+
+**Insights:**
+
+1.  Most residents fall between **ages 25 to 54**
+2.  **Youth population is shrinking**, suggesting long-term labor sustainability issues
+3.  **Senior population (65+) rising**, indicating growing need for eldercare and aging population
+
+### EDA 2: Gender Analysis
+
+```{r fig.height=8, fig.width=10}
+p3 <- ggplot(df, aes(x = Sex, y = Pop, fill = Sex)) +
+  stat_summary(fun = sum, geom = "bar") +
+  labs(title = "Population by Gender", x = NULL, y = "Population") +
+  scale_y_continuous(labels = label_comma()) +
+  common_theme
+
+p4 <- df %>%
+  group_by(Sex, AgeGroup) %>%
+  summarise(Pop = sum(Pop)) %>%
+  ggplot(aes(x = AgeGroup, y = Pop, fill = Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Gender Distribution by Age Group", y = "Population") +
+  scale_y_continuous(labels = label_comma()) +
+  common_theme
+
+(p3 / p4) + plot_layout(heights = c(1.2, 1))
+```
+
+**Insights:**
+
+1.  Gender balance is nearly equal overall
+2.  **Female dominates** in the senior age group, likely due to higher life expectancy
+
+### EDA 3:
+
+```{r fig.height=10, fig.width=10}
+df_pyramid <- df %>%
+  filter(AgeNum <= 90) %>%
+  mutate(Pop = ifelse(Sex == "Males", -Pop, Pop))
+
+p6 <- ggplot(df_pyramid, aes(x = AgeNum, y = Pop, fill = Sex)) +
+  geom_col(width = 1) +
+  coord_flip() +
+  labs(title = "Population Pyramid", x = "Age", y = "Population") +
+  scale_y_continuous(labels = label_comma()) +
+  common_theme
+
+p7 <- df %>%
+  group_by(Sex, AgeGroup) %>%
+  summarise(Pop = sum(Pop)) %>%
+  ggplot(aes(x = AgeGroup, y = Pop, fill = Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Age Group Distribution by Gender", y = "Population") +
+  scale_y_continuous(labels = label_comma()) +
+  common_theme
+
+(p6 / p7) + plot_layout(heights = c(1.3, 1))
+```
+
+**Insights:**
+
+1.  Pyramid shows **narrowing base wider top**, typical for aging societies
+2.  **Adults dominate** across both genders, seniors are the second largest group
+
+## 4. Conculsion
+
+1.  Singapore faces a demographic shift towards aging, requiring proactive planning
+2.  Uneven population spread across subzones and planning ares calls for smart urban development
+3.  This EDA provides clear insights and serves as baseline for policy design, urban planning, and future modelling

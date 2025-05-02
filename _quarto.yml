@@ -27,6 +27,10 @@ website:
         contents:
           - text: "Session 1"
             href: Session_notes/session_notes1.qmd
+      - section: "Take-Home Exercise"
+        contents:
+          - text: "Take-Home Ex01"
+            href: TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01.qmd
 
 format:
   html:
