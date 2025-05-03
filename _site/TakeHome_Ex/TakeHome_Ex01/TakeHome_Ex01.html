@@ -250,7 +250,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul class="collapse">
   <li><a href="#eda-1-population-by-age-age-group" id="toc-eda-1-population-by-age-age-group" class="nav-link" data-scroll-target="#eda-1-population-by-age-age-group">EDA 1: Population by Age / Age Group</a></li>
   <li><a href="#eda-2-gender-analysis" id="toc-eda-2-gender-analysis" class="nav-link" data-scroll-target="#eda-2-gender-analysis">EDA 2: Gender Analysis</a></li>
-  <li><a href="#eda-3" id="toc-eda-3" class="nav-link" data-scroll-target="#eda-3">EDA 3:</a></li>
+  <li><a href="#eda-3-population-structure-by-age-gender" id="toc-eda-3-population-structure-by-age-gender" class="nav-link" data-scroll-target="#eda-3-population-structure-by-age-gender">EDA 3: Population Structure by Age / Gender</a></li>
   </ul></li>
   <li><a href="#conculsion" id="toc-conculsion" class="nav-link" data-scroll-target="#conculsion">4. Conculsion</a></li>
   </ul></li>
@@ -516,8 +516,8 @@ $ Time &lt;int&gt; 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024, 2
 <li><strong>Female dominates</strong> in the senior age group, likely due to higher life expectancy</li>
 </ol>
 </section>
-<section id="eda-3" class="level3">
-<h3 class="anchored" data-anchor-id="eda-3">EDA 3:</h3>
+<section id="eda-3-population-structure-by-age-gender" class="level3">
+<h3 class="anchored" data-anchor-id="eda-3-population-structure-by-age-gender">EDA 3: Population Structure by Age / Gender</h3>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>df_pyramid <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span></span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(AgeNum <span class="sc">&lt;=</span> <span class="dv">90</span>) <span class="sc">%&gt;%</span></span>
