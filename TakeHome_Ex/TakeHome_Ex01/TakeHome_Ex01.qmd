@@ -3,11 +3,12 @@ title: "Take-Home Exercise 1"
 author: "Liu Chih Yuan"
 date: "April 29, 2025"
 date-modified: "last-modified"
+execute: 
+  eval: true        # run code 
+  echo: true         # show code 
+  warning: false     #warning msg wont come out
+  freeze: true      #speed up rendering time
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
-```
 
 # Exploratory Analysis of Age and Gender Distribution Across Singapore Planning Areas (2024)
 
@@ -107,15 +108,6 @@ We create a new column `AgeGroup` for future EDA purposes
 
 ```{r}
 str(df)
-```
-
-```{r}
-common_theme <- theme_minimal(base_size = 14) +
-  theme(
-    axis.text = element_text(size = 12),
-    axis.title = element_text(size = 14),
-    plot.title = element_text(size = 16, face = "bold")
-  )
 ```
 
 ## 3. Exploratory Data Analysis
