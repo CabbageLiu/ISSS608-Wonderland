@@ -23,6 +23,8 @@ website:
             href: Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.qmd
           - text: "Exercise 3 Part 2"
             href: Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03_2.qmd
+          - text: "Exercise 4 Part 1"
+            href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_1.qmd
       - section: "Session Notes"
         contents:
           - text: "Session 1"
