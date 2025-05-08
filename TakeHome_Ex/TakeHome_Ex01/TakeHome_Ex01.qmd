@@ -3,6 +3,7 @@ title: "Take-Home Exercise 1"
 author: "Liu Chih Yuan"
 date: "April 29, 2025"
 date-modified: "last-modified"
+format: html
 execute: 
   eval: true        # run code 
   echo: true         # show code 
