@@ -199,6 +199,42 @@
     ]
   },
   {
+    "objectID": "Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_2.html",
+    "href": "Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_2.html",
+    "title": "Hands On Exercise 4: Visual Statistical Analysis",
+    "section": "",
+    "text": "In this hands-on exercise, you will gain hands-on experience on using:",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 4 Part 2"
+    ]
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_2.html#visual-statistical-analysis-with-ggstatsplot",
+    "href": "Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_2.html#visual-statistical-analysis-with-ggstatsplot",
+    "title": "Hands On Exercise 4: Visual Statistical Analysis",
+    "section": "Visual Statistical Analysis with ggstatsplot",
+    "text": "Visual Statistical Analysis with ggstatsplot\nggstatsplot is an extension of ggplot2 package for creating graphics with details from statistical tests included in the information-rich plots themselves.",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 4 Part 2"
+    ]
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_2.html#getting-started",
+    "href": "Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_2.html#getting-started",
+    "title": "Hands On Exercise 4: Visual Statistical Analysis",
+    "section": "Getting Started",
+    "text": "Getting Started\n\nLoading Packages\n\npacman::p_load(ggstatsplot, tidyverse)\n\n\n\nLoad Data\n\nexam &lt;- read_csv(\"data/Exam_data.csv\")\n\n\n\nOne-sample test: gghistostats() method\n\n\nIn the code chunk below, gghistostats() is used to to build an visual of one-sample test on English scores.\n\nset.seed(1234)\n\ngghistostats(\n  data = exam,\n  x = ENGLISH,\n  type = \"bayes\",\n  test.value = 60,\n  xlab = \"English scores\"\n)\n\n\n\n\n\n\n\n\nDefault information: - statistical details - Bayes Factor - sample sizes - distribution summary\n\n\nUnpacking Bayes Factor\n\nA Bayes factor is the ratio of the likelihood of one particular hypothesis to the likelihood of another. It can be interpreted as a measure of the strength of evidence in favor of one theory among two competing theories.\nThat’s because the Bayes factor gives us a way to evaluate the data in favor of a null hypothesis, and to use external information to do so. It tells us what the weight of the evidence is in favor of a given hypothesis.\nWhen we are comparing two hypotheses, H1 (the alternate hypothesis) and H0 (the null hypothesis), the Bayes Factor is often written as B10. It can be defined mathematically as\n\n\n\nThe Schwarz criterion is one of the easiest ways to calculate rough approximation of the Bayes Factor.\n\n\n\nHow to interpret Bayes Factor\nA Bayes Factor can be any positive number. One of the most common interpretations is this one—first proposed by Harold Jeffereys (1961) and slightly modified by Lee and Wagenmakersin 2013:\n\n\n\nTwo-sample mean test: ggbetweenstats()\nIn the code chunk below, ggbetweenstats() is used to build a visual for two-sample mean test of Maths scores by gender.\n\nggbetweenstats(\n  data = exam,\n  x = GENDER, \n  y = MATHS,\n  type = \"np\",\n  messages = FALSE\n)\n\n\n\n\n\n\n\n\nDefault information: - statistical details - Bayes Factor - sample sizes - distribution summary\n\n\nOneway ANOVA Test: ggbetweenstats() method\n\nggbetweenstats(\n  data = exam,\n  x = RACE, \n  y = ENGLISH,\n  type = \"p\",\n  mean.ci = TRUE, \n  pairwise.comparisons = TRUE, \n  pairwise.display = \"s\",\n  p.adjust.method = \"fdr\",\n  messages = FALSE\n)\n\n\n\n\n\n\n\n\n\n“ns” → only non-significant\n“s” → only significant\n“all” → everything\n\n\nggbetweebstats - Summary of tests\n\n\n\n\n\nSignificant Test of Correlation: ggscatterstats()\nIn the code chunk below, ggscatterstats() is used to build a visual for Significant Test of Correlation between Maths scores and English scores.\n\nggscatterstats(\n  data = exam,\n  x = MATHS,\n  y = ENGLISH,\n  marginal = FALSE,\n  )\n\n\n\n\n\n\n\n\n\n\nSignificant Test of Association (Dependence): ggbarstats() methods\n\nexam1 &lt;- exam %&gt;% \n  mutate(MATHS_bins = \n           cut(MATHS, \n               breaks = c(0,60,75,85,100))\n)\n\nIn this code chunk below ggbarstats() is used to build a visual for Significant Test of Association\n\nggbarstats(exam1,\n           x = MATHS_bins,\n           y = GENDER)",
+    "crumbs": [
+      "Home",
+      "Hands-on Exercise",
+      "Exercise 4 Part 2"
+    ]
+  },
+  {
     "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html",
     "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html",
     "title": "Hands-on_Ex03",
