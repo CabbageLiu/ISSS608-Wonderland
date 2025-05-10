@@ -23,13 +23,13 @@ website:
             href: Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.qmd
           - text: "Exercise 3 Part 2"
             href: Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03_2.qmd
-          - text: "Exercise 4 Part 1"
+          - text: "Exercise 4a"
             href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_1.qmd
-          - text: "Exercise 4 Part 2"
+          - text: "Exercise 4b"
             href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_2.qmd
-          - text: "Exercise 4 Part 3"
+          - text: "Exercise 4c"
             href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_3.qmd
-          - text: "Exercise 4 Part 4"
+          - text: "Exercise 4d"
             href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_4.qmd
       - section: "Session Notes"
         contents:
@@ -37,9 +37,10 @@ website:
             href: Session_notes/session_notes1.qmd
       - section: "Take-Home Exercise"
         contents:
-          - text: "Take-Home Ex01"
+          - text: "Take-Home Ex01 A"
             href: TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01.qmd
-
+          - text: "Take-Home Ex01 B"
+            href: TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.qmd
 format:
   html:
     theme: minty

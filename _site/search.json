@@ -147,7 +147,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 1"
+      "Exercise 4a"
     ]
   },
   {
@@ -159,7 +159,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 1"
+      "Exercise 4a"
     ]
   },
   {
@@ -171,7 +171,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 1"
+      "Exercise 4a"
     ]
   },
   {
@@ -183,7 +183,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 1"
+      "Exercise 4a"
     ]
   },
   {
@@ -195,7 +195,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 1"
+      "Exercise 4a"
     ]
   },
   {
@@ -207,7 +207,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 3"
+      "Exercise 4c"
     ]
   },
   {
@@ -219,7 +219,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 3"
+      "Exercise 4c"
     ]
   },
   {
@@ -231,7 +231,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 3"
+      "Exercise 4c"
     ]
   },
   {
@@ -243,7 +243,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 3"
+      "Exercise 4c"
     ]
   },
   {
@@ -255,7 +255,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 3"
+      "Exercise 4c"
     ]
   },
   {
@@ -267,7 +267,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 4"
+      "Exercise 4d"
     ]
   },
   {
@@ -279,7 +279,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 4"
+      "Exercise 4d"
     ]
   },
   {
@@ -291,7 +291,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 4"
+      "Exercise 4d"
     ]
   },
   {
@@ -303,7 +303,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 4"
+      "Exercise 4d"
     ]
   },
   {
@@ -315,7 +315,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 4"
+      "Exercise 4d"
     ]
   },
   {
@@ -327,7 +327,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 2"
+      "Exercise 4b"
     ]
   },
   {
@@ -339,7 +339,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 2"
+      "Exercise 4b"
     ]
   },
   {
@@ -351,7 +351,7 @@
     "crumbs": [
       "Home",
       "Hands-on Exercise",
-      "Exercise 4 Part 2"
+      "Exercise 4b"
     ]
   },
   {
@@ -533,7 +533,7 @@
     "crumbs": [
       "Home",
       "Take-Home Exercise",
-      "Take-Home Ex01"
+      "Take-Home Ex01 A"
     ]
   },
   {
@@ -545,7 +545,7 @@
     "crumbs": [
       "Home",
       "Take-Home Exercise",
-      "Take-Home Ex01"
+      "Take-Home Ex01 A"
     ]
   },
   {
@@ -557,7 +557,7 @@
     "crumbs": [
       "Home",
       "Take-Home Exercise",
-      "Take-Home Ex01"
+      "Take-Home Ex01 A"
     ]
   },
   {
@@ -569,7 +569,7 @@
     "crumbs": [
       "Home",
       "Take-Home Exercise",
-      "Take-Home Ex01"
+      "Take-Home Ex01 A"
     ]
   },
   {
@@ -581,7 +581,79 @@
     "crumbs": [
       "Home",
       "Take-Home Exercise",
-      "Take-Home Ex01"
+      "Take-Home Ex01 A"
+    ]
+  },
+  {
+    "objectID": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html",
+    "href": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html",
+    "title": "Take-Home Exercise 1 Part 2",
+    "section": "",
+    "text": "Commenting on David Chiam’s EDA 3.2",
+    "crumbs": [
+      "Home",
+      "Take-Home Exercise",
+      "Take-Home Ex01 B"
+    ]
+  },
+  {
+    "objectID": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html#setting-the-scene",
+    "href": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html#setting-the-scene",
+    "title": "Take-Home Exercise 1 Part 2",
+    "section": "Setting the scene",
+    "text": "Setting the scene\nA local online media company that publishes daily content on digital platforms is planning to release an article on demographic structures and distribution of Singapore in 2024.",
+    "crumbs": [
+      "Home",
+      "Take-Home Exercise",
+      "Take-Home Ex01 B"
+    ]
+  },
+  {
+    "objectID": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html#the-task",
+    "href": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html#the-task",
+    "title": "Take-Home Exercise 1 Part 2",
+    "section": "The task",
+    "text": "The task\nAssuming the role of the graphical editor of the media company, the task was to prepare at most three data visualisation for the exercise.\nHence in this exercise, I curated three key visualisations as part of dats exploration:\n\nGenerational Distribution by Region: A paired bar chart highlights both absolute and relative generational makeup across Singapore’s five planning regions, revealing the Central and East as home to proportionally older populations.\nAge Demographics by Planning Area: A boxplot with overlaid generation bands showcases median age and interquartile ranges, emphasising regions with mature population profiles like Central and West Singapore.\nTop Planning Areas by Age Band: A set of ranked bar charts and accompanying pie charts depict the top 15 planning areas by population size in three age segments—youth (0–24), adults (25–54), and seniors (55+). These are complemented with gender breakdowns to visualise demographic imbalances.",
+    "crumbs": [
+      "Home",
+      "Take-Home Exercise",
+      "Take-Home Ex01 B"
+    ]
+  },
+  {
+    "objectID": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html#good-points",
+    "href": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html#good-points",
+    "title": "Take-Home Exercise 1 Part 2",
+    "section": "Good points",
+    "text": "Good points\n\nClear Breakdown by Generation\n\nThe stacked bar plots clearly distinguished generations using multiple colors and labels, making it easy to digest\n\nGood Use of Facets (Counts vs Percentage)\n\nShows both raw counts and percentages side by side for good comparison\n\nBoxplot with Annotated Summary Stats\n\nLabels on age distribution boxplot aids for easier interpretation",
+    "crumbs": [
+      "Home",
+      "Take-Home Exercise",
+      "Take-Home Ex01 B"
+    ]
+  },
+  {
+    "objectID": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html#improvements",
+    "href": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html#improvements",
+    "title": "Take-Home Exercise 1 Part 2",
+    "section": "Improvements",
+    "text": "Improvements\n\nFont Size Too Small for Lables\n\nIssue: text is hard to read\nFix: increase font size to improve readability\n\nColor Palette Not Very Readable\n\nIssue: hard to read and not colorblind friendly\nFix: use color palette such as viridis or OkabeIto\n\nOvercrowded Text in Stacked Bars\n\nIssue: readability of text inside stacked bars are not good\nFix: display labels for only larger segments",
+    "crumbs": [
+      "Home",
+      "Take-Home Exercise",
+      "Take-Home Ex01 B"
+    ]
+  },
+  {
+    "objectID": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html#revised-version-of-eda-3.2",
+    "href": "TakeHome_Ex/TakeHome_Ex01/TakeHome_Ex01B.html#revised-version-of-eda-3.2",
+    "title": "Take-Home Exercise 1 Part 2",
+    "section": "Revised Version of EDA 3.2",
+    "text": "Revised Version of EDA 3.2",
+    "crumbs": [
+      "Home",
+      "Take-Home Exercise",
+      "Take-Home Ex01 B"
     ]
   }
 ]
