@@ -45,7 +45,7 @@ Before importing the data, we load several R packages from the **tidyverse** eco
 📌 **Summary of Package Roles**
 
 | Library | Description |
-|--------------------------|---------------------------------------------|
+|---------------------------|---------------------------------------------|
 | [**tidyverse**](https://www.tidyverse.org/) | A collection of core packages designed for data science, used extensively for data preparation and wrangling |
 | [**knitr**](https://yihui.org/knitr/) | Generates dynamic R markdown or Quarto reports |
 | [**patchwork**](https://patchwork.data-imaginist.com/) | Combine multiple ggplots into a single layout |
@@ -709,7 +709,7 @@ Supporting this, the **boxplots and age summaries** reveal **higher median ages*
 
 ## Revised Version of EDA 3.2
 
-```{r, echo=FALSE, fig.width=12, fig.height=15}
+```{r, echo=FALSE, fig.width=16, fig.height=15}
 library(ggplot2)
 library(dplyr)
 library(scales)
