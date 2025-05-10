@@ -10,7 +10,8 @@ execute:
   eval: true
   echo: true
   warning: false
-  freeze: true
+  message: false
+  freeze: auto
 ---
 
 ::: callout-note
@@ -44,7 +45,7 @@ Before importing the data, we load several R packages from the **tidyverse** eco
 📌 **Summary of Package Roles**
 
 | Library | Description |
-|--------------------------|----------------------------------------------|
+|--------------------------|---------------------------------------------|
 | [**tidyverse**](https://www.tidyverse.org/) | A collection of core packages designed for data science, used extensively for data preparation and wrangling |
 | [**knitr**](https://yihui.org/knitr/) | Generates dynamic R markdown or Quarto reports |
 | [**patchwork**](https://patchwork.data-imaginist.com/) | Combine multiple ggplots into a single layout |
@@ -101,7 +102,7 @@ glimpse(df)
 🧾 **Variable Descriptions**
 
 | Column | Type | Description |
-|-------------------|------------------------|------------------------------|
+|-------------------|------------------------|-----------------------------|
 | `PA` | Categorical | Planning Area (e.g., Ang Mo Kio, Bedok) |
 | `SZ` | Categorical | Subzone within each Planning Area |
 | `Age` | Categorical (to be converted) | Age in single years (e.g., 0–100+) |
@@ -671,7 +672,7 @@ plot_counts + plot_perc + plot_layout(guides = "collect") &
 :::
 
 ::: How-Does-it-Work
-![](/Images/Insights.png){width="42"} [<strong>Insights gleamed from these plots in section 3.2</strong>]{style="font-size: 30px; vertical-align: middle;"}
+[<strong>Insights gleamed from these plots in section 3.2</strong>]{style="font-size: 30px; vertical-align: middle;"}
 
 These visualisations compares Singapore’s resident population by generation across the five main planning regions, using both absolute ounts (left panel) and proportional shares (right panel). **Working adults (ages 35–54)** form the largest demographic in all regions, especially in the **East and North**. However, the **Central region** stands out for its **higher concentration of older residents**, particularly from the **Merdeka and Pioneer generations**, both in absolute numbers and as a proportion of its population.
 
