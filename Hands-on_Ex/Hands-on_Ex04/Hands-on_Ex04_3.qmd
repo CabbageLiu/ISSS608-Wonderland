@@ -283,7 +283,7 @@ Gentle advice: This function comes with many arguments, students are advised to 
 
 ### Installing `ungeviz` package
 
-```{r}
+```{r eval=FALSE}
 devtools::install_github("wilkelab/ungeviz")
 ```
 
