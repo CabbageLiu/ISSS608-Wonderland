@@ -128,7 +128,7 @@ ggscatterstats(
   data = exam,
   x = MATHS,
   y = ENGLISH,
-  marginal = FALSE,
+  marginal = TRUE,
   )
 ```
 

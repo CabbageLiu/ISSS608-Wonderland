@@ -162,7 +162,7 @@ ggplot(exam,
                point_colour = NA)
 ```
 
-### Adding boxplot with `geom_boxplot()` 
+### Adding boxplot with `geom_boxplot()`
 
 Next, we will add the second geometry layer using [`geom_boxplot()`](https://r4va.netlify.app/chap09) of ggplot2. This produces a narrow boxplot. We reduce the width and adjust the opacity.
 
