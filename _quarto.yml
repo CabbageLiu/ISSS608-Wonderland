@@ -19,9 +19,9 @@ website:
             href: Hands-on_Ex/Hands-on_Ex01/Hands-on_Ex01.qmd
           - text: "Exercise 2"
             href: Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.qmd
-          - text: "Exercise 3 Part 1"
+          - text: "Exercise 3a"
             href: Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.qmd
-          - text: "Exercise 3 Part 2"
+          - text: "Exercise 3b"
             href: Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03_2.qmd
           - text: "Exercise 4a"
             href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_1.qmd
@@ -31,6 +31,8 @@ website:
             href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_3.qmd
           - text: "Exercise 4d"
             href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_4.qmd
+          - text: "Exercise 5"
+            href: Hands-on_Ex/Hands-on_Ex05/Hands-on_Ex05.qmd
       - section: "Session Notes"
         contents:
           - text: "Session 1"

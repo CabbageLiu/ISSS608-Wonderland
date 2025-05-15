@@ -47,7 +47,7 @@ Before importing the data, we load several R packages from the **tidyverse** eco
 📌 **Summary of Package Roles**
 
 | Library | Description |
-|------------------------------------|------------------------------------|
+|----|----|
 | [**tidyverse**](https://www.tidyverse.org/) | A collection of core packages designed for data science, used extensively for data preparation and wrangling |
 | [**knitr**](https://yihui.org/knitr/) | Generates dynamic R markdown or Quarto reports |
 | [**patchwork**](https://patchwork.data-imaginist.com/) | Combine multiple ggplots into a single layout |
@@ -104,7 +104,7 @@ glimpse(df)
 🧾 **Variable Descriptions**
 
 | Column | Type | Description |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `PA` | Categorical | Planning Area (e.g., Ang Mo Kio, Bedok) |
 | `SZ` | Categorical | Subzone within each Planning Area |
 | `Age` | Categorical (to be converted) | Age in single years (e.g., 0–100+) |
