@@ -1075,5 +1075,54 @@
       "Take-Home Exercise",
       "Take-Home Ex01 B"
     ]
+  },
+  {
+    "objectID": "MC1/MC1_InClass.html",
+    "href": "MC1/MC1_InClass.html",
+    "title": "MC1",
+    "section": "",
+    "text": "pacman::p_load(tidyverse, jsonlite, SmartEDA, tidygraph, ggraph)"
+  },
+  {
+    "objectID": "MC1/MC1_InClass.html#import",
+    "href": "MC1/MC1_InClass.html#import",
+    "title": "MC1",
+    "section": "Import",
+    "text": "Import\n\nkg &lt;- fromJSON(\"data/MC1_release/MC1_graph.json\")"
+  },
+  {
+    "objectID": "MC1/MC1_InClass.html#inspect-structure",
+    "href": "MC1/MC1_InClass.html#inspect-structure",
+    "title": "MC1",
+    "section": "Inspect Structure",
+    "text": "Inspect Structure\n\nstr(kg, max.level=1)\n\nList of 5\n $ directed  : logi TRUE\n $ multigraph: logi TRUE\n $ graph     :List of 2\n $ nodes     :'data.frame': 17412 obs. of  10 variables:\n $ links     :'data.frame': 37857 obs. of  4 variables:"
+  },
+  {
+    "objectID": "MC1/MC1_InClass.html#extract-and-inspect",
+    "href": "MC1/MC1_InClass.html#extract-and-inspect",
+    "title": "MC1",
+    "section": "Extract and Inspect",
+    "text": "Extract and Inspect\nthis is like extracting part of the data\nwe used to have to go into kg -&gt; nodes -&gt; table, now we can just click on edges_tbl\n\nnodes_tbl &lt;- as_tibble(kg$nodes)\nedges_tbl &lt;- as_tibble(kg$links)"
+  },
+  {
+    "objectID": "MC1/MC1_InClass.html#initial-eda",
+    "href": "MC1/MC1_InClass.html#initial-eda",
+    "title": "MC1",
+    "section": "Initial EDA",
+    "text": "Initial EDA\n\nggplot(data = edges_tbl,\n       aes(y = `Edge Type`)) +\n  geom_bar()\n\n\n\n\n\n\n\n\n\nggplot(data = nodes_tbl,\n       aes(y = `Node Type`)) +\n  geom_bar()"
+  },
+  {
+    "objectID": "MC1/MC1_InClass.html#creating-knowledge-graph",
+    "href": "MC1/MC1_InClass.html#creating-knowledge-graph",
+    "title": "MC1",
+    "section": "Creating knowledge graph",
+    "text": "Creating knowledge graph\n\nStep 1. Mapping from node id to row index\n\nid_map &lt;- tibble(id = nodes_tbl$id,\n                 index = seq_len(\n                   nrow(nodes_tbl)))\n\nThis ensures each id from your node list is mapped to the correct row number\n\n\nStep 2. Map source and target IDs to row indices\n\nedges_tbl &lt;- edges_tbl %&gt;%\n  left_join(id_map, by = c(\"source\" = \"id\")) %&gt;%\n  rename(from = index) %&gt;%\n  left_join(id_map, by = c(\"target\" = \"id\")) %&gt;%\n  rename(to = index)\n\n\n\nStep 3. Filter out any unmatched (invalid) edges\n\nedges_tbl &lt;- edges_tbl %&gt;%\n  filter(!is.na(from), !is.na(to))\n\n\n\nStep 4. Creating the graph\nLastly, tbl_graph() is used to create tidygraph graph object by using the code chunk below\nwe can also tweak directed as True\n\ngraph &lt;- tbl_graph(nodes = nodes_tbl,\n                   edges = edges_tbl,\n                   directed = kg$directed)"
+  },
+  {
+    "objectID": "MC1/MC1_InClass.html#visualizing-the-knowledge-graph",
+    "href": "MC1/MC1_InClass.html#visualizing-the-knowledge-graph",
+    "title": "MC1",
+    "section": "Visualizing the knowledge graph",
+    "text": "Visualizing the knowledge graph\n\nset.seed(1234)\n\n\n2.1 Visualizing the whole graph\n\nggraph(graph, layout = \"fr\") +\n  geom_edge_link(alpha = 0.3,\n                 colour = \"gray\") +\n  geom_node_point(aes(color = `Node Type`),\n                  size = 4) +\n  geom_node_text(aes(label = name),\n                 repel = TRUE,\n                 size = 2.5) +\n  theme_void()\n\nDoesn’t really show meanings, so we move on to subgraph\n\n\n2.2 Step 1 Filter edges to only “Memberof”\n\ngraph_memberof &lt;- graph %&gt;%\n  activate(edges) %&gt;%\n  filter(`Edge Type` == \"Memberof\")\n\n\n\n2.2 Step 2 Extract only connected nodes (eg. used in these edges)\n\nused_node_indicies &lt;- graph_memberof %&gt;%\n  activate(edges) %&gt;%\n  as_tibble() %&gt;%\n  select(from, to) %&gt;%\n  unlist() %&gt;%\n  unique()\n\n\n\n2.3 Step 3 Keep only the nodes\n\ngraph_memberof &lt;- graph_memberof %&gt;%\n  activate(nodes) %&gt;%\n  mutate(row_id = row_number()) %&gt;%\n  filter(row_id %in% used_node_indicies) %&gt;%\n  select(-row_id)\n\n\n\n2.4 Plot sub-graph\n\nggraph(graph_memberof,\n       layout = \"fr\") +\n  geom_edge_link(alpha = 0.5,\n                 colour = \"gray\") +\n  geom_node_point(aes(color = `Node Type`),\n                  size = 1) +\n  geom_node_text(aes(label = name),\n                 repel = TRUE,\n                 size = 2.25) +\n  theme_void()"
   }
 ]
