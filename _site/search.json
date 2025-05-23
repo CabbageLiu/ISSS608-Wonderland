@@ -1223,7 +1223,7 @@
     "href": "Hands-on_Ex/Hands-on_Ex06/Hands-on_Ex06.html#plotting-the-slopegraph",
     "title": "Hands On Exercise 6: Visualising and Analysing Time-oriented Data",
     "section": "Plotting the slopegraph",
-    "text": "Plotting the slopegraph\n\nrice %&gt;% \n  mutate(Year = factor(Year)) %&gt;%\n  filter(Year %in% c(1961, 1980)) %&gt;%\n  newggslopegraph(Year, Yield, Country,\n                Title = \"Rice Yield of Top 11 Asian Counties\",\n                SubTitle = \"1961-1980\",\n                Caption = \"Prepared by: Dr. Kam Tin Seong\")\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nNote\n\n\n\nFor effective data visualisation design, factor() is used convert the value type of Year field from numeric to factor.",
+    "text": "Plotting the slopegraph\n\nrice %&gt;% \n  mutate(Year = factor(Year)) %&gt;%\n  filter(Year %in% c(1961, 1980)) %&gt;%\n  newggslopegraph(Year, Yield, Country,\n                Title = \"Rice Yield of Top 11 Asian Counties\",\n                SubTitle = \"1961-1980\",\n                Caption = \"Prepared by: Liu Chih Yuan\")\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nNote\n\n\n\nFor effective data visualisation design, factor() is used convert the value type of Year field from numeric to factor.",
     "crumbs": [
       "Home",
       "Hands-on Exercise",
