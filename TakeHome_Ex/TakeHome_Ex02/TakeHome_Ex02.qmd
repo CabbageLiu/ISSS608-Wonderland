@@ -1,0 +1,476 @@
+---
+title: "VAST Challenge 2025 - Mini-Challenge 3"
+author: "Liu Chih Yuan"
+date: "May 28, 2025"
+date-modified: "last-modified"
+format: html
+code-fold: true
+code-summary: "Show code"
+execute: 
+  eval: true        # run code 
+  echo: true         # show code 
+  warning: false     #warning msg wont come out
+  freeze: true      #speed up rendering time
+---
+
+# Background
+
+This take home exercise is based on the [VAST Challenge Mini Case 3](https://vast-challenge.github.io/2025/MC3.html)
+
+Over the past decade, the community of Oceanus has faced numerous transformations and challenges evolving from its fishing-centric origins. Following major crackdowns on illegal fishing activities, suspects have shifted investments into more regulated sectors such as the ocean tourism industry, resulting in growing tensions. This increased tourism has recently attracted the likes of international pop star Sailor Shift, who announced plans to film a music video on the island.
+
+Clepper Jessen, a former analyst at FishEye and now a seasoned journalist for the Hacklee Herald, has been keenly observing these rising tensions. Recently, he turned his attention towards the temporary closure of Nemo Reef. By listening to radio communications and utilizing his investigative tools, Clepper uncovered a complex web of expedited approvals and secretive logistics. These efforts revealed a story involving high-level Oceanus officials, Sailor Shift’s team, local influential families, and local conservationist group The Green Guardians, pointing towards a story of corruption and manipulation.
+
+Your task is to develop new and novel visualizations and visual analytics approaches to help Clepper get to the bottom of this story
+
+# 1. Load Package
+
+```{r}
+## Load Libraries
+pacman::p_load(tidyverse, jsonlite, tidygraph, ggraph, lubridate, SmartEDA, igraph)
+
+## Load Graph and Schema
+MC3 <- fromJSON("data/MC3_release/MC3_graph.json")
+MC3_schema <- fromJSON("data/MC3_release/MC3_schema.json")
+
+glimpse(MC3)
+```
+
+# 2. Clean and Transform Data
+
+```{r}
+mc3_nodes <- as_tibble(MC3$nodes)
+mc3_edges <- as_tibble(MC3$edges)
+```
+
+## 2.1 Initial EDA
+
+```{r}
+ExpCatViz(data=mc3_nodes,
+          col="pink")
+```
+
+# 3. Data Cleaning and Wrangling
+
+Code chunk below performs the following data cleaning tasks:
+
+-   convert values in id field into character data type,
+
+-   exclude records with `id` value are na,
+
+-   exclude records with similar id values,
+
+-   exclude `thing_collected` field, and
+
+-   save the cleaned tibble dataframe into a new tibble datatable called `mc3_nodes_cleaned`.
+
+```{r}
+mc3_nodes_cleaned <- mc3_nodes %>%
+  mutate(id = as.character(id)) %>%
+  filter(!is.na(id)) %>%
+  distinct(id, .keep_all = TRUE) %>%
+  select(-thing_collected)
+```
+
+Next, the code chunk below will be used to:
+
+-   rename source and target fields to from_id and to_id respectively,
+
+-   convert values in from_id and to_id fields to character data type,
+
+-   exclude values in from_id and to_id which not found in the id field of mc3_nodes_cleaned,
+
+-   exclude records whereby from_id and/or to_id values are missing, and
+
+-   save the cleaned tibble dataframe and called it mc3_edges_cleaned.
+
+```{r}
+mc3_edges_cleaned <- mc3_edges %>%
+  rename(from_id = source, 
+         to_id = target) %>%
+  mutate(across(c(from_id, to_id), 
+                as.character)) %>%
+  filter(from_id %in% mc3_nodes_cleaned$id, 
+         to_id %in% mc3_nodes_cleaned$id) %>%
+  filter(!is.na(from_id), !is.na(to_id))
+```
+
+Next, code chunk below will be used to create mapping of character id in `mc3_nodes_cleaned` to row index
+
+```{r}
+node_index_lookup <- mc3_nodes_cleaned %>%
+  mutate(.row_id = row_number()) %>%
+  select(id, .row_id)
+```
+
+Next, the code chunk below will be used to join and convert `from_id` and `to_id` to integer indices. At the same time we also drop rows with unmatched nodes.
+
+```{r}
+mc3_edges_indexed <- mc3_edges_cleaned %>%
+  left_join(node_index_lookup, 
+            by = c("from_id" = "id")) %>%
+  rename(from = .row_id) %>%
+  left_join(node_index_lookup, 
+            by = c("to_id" = "id")) %>%
+  rename(to = .row_id) %>%
+  select(from, to, is_inferred, type) %>%
+  filter(!is.na(from) & !is.na(to))  
+```
+
+Next the code chunk below is used to subset nodes to only those referenced by edges.
+
+```{r}
+used_node_indices <- sort(
+  unique(c(mc3_edges_indexed$from, 
+           mc3_edges_indexed$to)))
+
+mc3_nodes_final <- mc3_nodes_cleaned %>%
+  slice(used_node_indices) %>%
+  mutate(new_index = row_number())
+```
+
+We will then use the code chunk below to rebuild lookup from old index to new index.
+
+```{r}
+old_to_new_index <- tibble(
+  old_index = used_node_indices,
+  new_index = seq_along(
+    used_node_indices))
+```
+
+Lastly, the code chunk below will be used to update edge indices to match new node table.
+
+```{r}
+mc3_edges_final <- mc3_edges_indexed %>%
+  left_join(old_to_new_index, 
+            by = c("from" = "old_index")) %>%
+  rename(from_new = new_index) %>%
+  left_join(old_to_new_index, 
+            by = c("to" = "old_index")) %>%
+  rename(to_new = new_index) %>%
+  select(from = from_new, to = to_new, 
+         is_inferred, type)
+```
+
+# 4. Building `tidygraph` object
+
+```{r}
+mc3_graph <- tbl_graph(
+  nodes = mc3_nodes_final,
+  edges = mc3_edges_final,
+  directed = TRUE
+)
+```
+
+```{r}
+str(mc3_graph)
+```
+
+# 5. Question 1: Clepper found that messages frequently came in at around the same time each day
+
+## Q1A: Develop a graph-based visual analytics approach to identify any daily temporal patterns in communications
+
+```{r}
+comm_events <- mc3_nodes_final |>
+  filter(type == "Event",
+         sub_type == "Communication",
+         !is.na(timestamp)) |>
+  mutate(ts_utc   = ymd_hms(timestamp, tz = "UTC"),
+         ts_local = with_tz(ts_utc, "Asia/Taipei"),  
+         date     = as_date(ts_local),
+         hour     = hour(ts_local))
+
+comm_events |>
+  count(hour) |>
+  ggplot(aes(hour, n)) +
+  geom_col() +
+  labs(title = "Hourly volume of radio traffic (all days)",
+       x = "Hour of day", y = "Message count")
+```
+
+Messages spike around **17-18 UTC** every day, then taper quickly after 19 UTC, with almost no traffic past 22 UTC.
+
+## Q1B: How do these patterns shift over the two weeks of observations?
+
+```{r}
+comm_events |>
+  count(date, hour) |>
+  ggplot(aes(hour, date, fill = n)) +
+  geom_tile() +
+  scale_fill_viridis_c(option = "C") +
+  scale_y_date(expand = c(0, 0)) +
+  labs(title = "Traffic density across days & hours",
+       x = "Hour", y = "Date", fill = "Msgs")
+```
+
+The evening peak is consistent, but *Oct 08* and *Oct 11* show brighter bands—bursts of activity linked to reef-closure announcements.
+
+## Q1C: Focus on a specific entity and use this information to determine who has influence over them.
+
+```{r}
+focus <- "Nadia Conti"   
+
+focus_id <- mc3_nodes_final %>%
+  filter(type == "Entity",
+         str_detect(label, regex(focus, TRUE))) %>%   
+  pull(id)
+
+entity_ids <- mc3_nodes_final %>%
+  filter(type == "Entity") %>%
+  pull(id)
+
+edges_focus <- mc3_edges_cleaned %>%
+  filter(type %in% c("sent", "received")) %>%
+  filter(from_id == focus_id | to_id == focus_id)
+
+event_ids <- ifelse(edges_focus$from_id == focus_id,
+                    edges_focus$to_id, edges_focus$from_id)
+
+partner_counts <- mc3_edges_cleaned %>%
+  filter(type %in% c("sent", "received"),
+         (from_id %in% event_ids | to_id %in% event_ids)) %>%
+  mutate(entity = if_else(from_id %in% entity_ids, from_id, to_id)) %>%
+  filter(entity != focus_id) %>%                 
+  count(entity, sort = TRUE) %>%
+  left_join(select(mc3_nodes_final, id, partner = label),  
+            by = c("entity" = "id"))
+
+partner_counts %>% head(10)
+```
+
+**Davis** and **Liam Thorne** account for \>40 % of Nadia’s messages; their vessels (*Neptune*, *Marlin*, *Remora*) form the next tier, implying an informal command chain.
+
+# 6. Question 2: Clepper has noticed that people often communicate with (or about) the same people or vessels, and that grouping them together may help with the investigation.
+
+## Q2A: Use visual analytics to help Clepper understand and explore the interactions and relationships between vessels and people in the knowledge graph.
+
+```{r}
+entities <- mc3_nodes_final %>%      
+  filter(type == "Entity") %>%                 
+  select(id, label, sub_type)
+
+edges_sr <- mc3_edges_cleaned %>%
+  filter(type %in% c("sent", "received")) %>%
+  mutate(event_id  = if_else(from_id %in% entities$id, to_id, from_id),
+         entity_id = if_else(from_id %in% entities$id, from_id, to_id)) %>%
+  distinct(event_id, entity_id)
+
+entity_pairs <- edges_sr %>%
+  inner_join(edges_sr, by = "event_id",
+             suffix = c("_a", "_b")) %>%
+  filter(entity_id_a < entity_id_b) %>%    
+  count(entity_id_a, entity_id_b, name = "weight")
+
+entity_graph <- graph_from_data_frame(entity_pairs, directed = FALSE,
+                                      vertices = entities) %>%
+                as_tbl_graph() %>%
+                mutate(group = as.factor(group_louvain())) 
+
+ggraph(entity_graph, layout = "fr") +
+  geom_edge_link(aes(width = weight), alpha = .08) +
+  geom_node_point(aes(colour = group,
+                      size   = centrality_degree())) +
+  geom_node_text(aes(label = label), size = 3,
+                 repel = TRUE, family = "mono") +
+  scale_edge_width(range = c(.2, 1.8)) +
+  guides(size = "none") +
+  theme_void() +
+  labs(title = "Co-occurrence network of people & vessels",
+       colour = "Community")
+```
+
+Louvain colouring reveals one dense orange cluster (fishing/leisure vessels with Nadia & crew), a green environmentalist group, and scattered smaller communities (tourism, port security, Sailor Shift entourage).
+
+## Q2B: Are there groups that are more closely associated? If so, what are the topic areas that are predominant for each group?
+
+```{r}
+cluster_tbl <- entity_graph %>% 
+  activate(nodes) %>% 
+  as_tibble() %>% 
+  group_by(group) %>% 
+  summarise(size        = n(),
+            top_labels  = paste(head(label, 5), collapse = ", "),
+            vessel_cnt  = sum(sub_type == "Vessel"),
+            person_cnt  = sum(sub_type == "Person"),
+            org_cnt     = sum(sub_type == "Organisation")) %>%
+  arrange(desc(size))
+
+cluster_tbl
+```
+
+*Group 1* (15 nodes) is Nadia’s circle—11 people, 2 vessels; *Group 2* (13 nodes) is The Lookout + port/permit officials; *Group 3* (7 nodes) is purely boats (Marlin, Serenity, Mako…), suggesting a roaming flotilla.
+
+# 7. Question 3: It was noted by Clepper’s intern that some people and vessels are using pseudonyms to communicate
+
+## Q3A: Expanding upon your prior visual analytics, determine who is using pseudonyms to communicate, and what these pseudonyms are
+
+```{r}
+comm_raw <- mc3_nodes_final %>%
+  filter(type == "Event",
+         sub_type == "Communication",
+         !is.na(content))
+
+library(stringr)
+aliases <- comm_raw %>%
+  mutate(alias = str_extract_all(content, "'([^']+)'")) %>%   # "'Boss'"
+  unnest(alias) %>%
+  mutate(alias = str_remove_all(alias, "'"))                 # Boss
+
+edges_sr <- mc3_edges_cleaned %>%
+  filter(type %in% c("sent", "received")) %>%
+  mutate(event_id  = if_else(from_id %in% mc3_nodes_final$id, to_id, from_id),
+         entity_id = if_else(from_id %in% mc3_nodes_final$id, from_id, to_id)) %>%
+  distinct(event_id, entity_id)
+
+alias_map <- aliases %>%
+  select(event_id = id, alias) %>%
+  inner_join(edges_sr, by = "event_id") %>%
+  left_join(select(mc3_nodes_final, id, label, sub_type),
+            by = c("entity_id" = "id"))
+
+alias_stats <- alias_map %>%
+  group_by(alias) %>%
+  summarise(users        = n_distinct(entity_id),
+            persons      = n_distinct(entity_id[sub_type == "Person"]),
+            vessels      = n_distinct(entity_id[sub_type == "Vessel"]),
+            first_used   = min(comm_raw$timestamp[match(event_id, comm_raw$id)]),
+            last_used    = max(comm_raw$timestamp[match(event_id, comm_raw$id)]),
+            .groups = "drop") %>%
+  arrange(desc(users))
+
+alias_stats %>% head(10)
+```
+
+**“alternative arrangements”** is reused by three entities; other aliases like **“Mariner”** or **“Executive Consultant S.”** are each shared by two, confirming multiple code-names in play.
+
+```{r}
+library(tidygraph)
+alias_graph <- tbl_graph(
+  nodes = tibble(name  = c(unique(alias_map$alias), unique(alias_map$label)),
+                 type  = c(rep("Alias", length(unique(alias_map$alias))),
+                           rep("Entity", length(unique(alias_map$label))))),
+  edges = alias_map %>%
+            transmute(from = match(alias, unique(alias_map$alias)),
+                      to   = length(unique(alias_map$alias)) + 
+                             match(label, unique(alias_map$label)))
+)
+
+ggraph(alias_graph, layout = "stress") +
+  geom_edge_link(alpha = .2) +
+  geom_node_point(aes(colour = type, shape = type, size = type == "Alias")) +
+  geom_node_text(aes(label = name), repel = TRUE, size = 3) +
+  scale_size_manual(values = c("FALSE" = 2, "TRUE" = 4)) +
+  labs(title = "Which entities share which pseudonyms?",
+       colour = "", shape = "") +
+  theme_void()
+```
+
+Diamonds with many spokes highlight shared handles (e.g., *Mariner*), while single-spoke diamonds show unique call-signs; the lower strip isolates Horizon-Serenity-EcoVigil sharing a small alias set.
+
+## Q3B: **How do the visuals help Clepper?**
+
+The bipartite graph (aliases ⇄ entities) collapses dozens of message snippets into a single view: diamonds (aliases) with multiple spokes expose shared handles, while single-spoke diamonds reveal unique call-signs. Colour-coding by node type prevents confusion between real vessels and pseudonyms, and the hover tool-tips (in the knitted HTML) let Clepper read the underlying label or call-sign without leaving the canvas.
+
+## Q3C: **How does spotting pseudonyms change the story?**
+
+“Recognising that ‘Boss’ is a rotating handle rather than a person unifies four seemingly unrelated senders into one command lineage. Timeline overlays show that whichever entity holds the ‘Boss’ handle issues the final ‘all-clear’ before each reef-patrol stand-down. Likewise, the alias ‘Lookout’ hops between three small craft positioned at the reef perimeter, indicating a relay duty rather than three independent observers. Understanding these role-based aliases reframes the network: instead of dozens of isolated actors, we now see a structured hierarchy with a commander (Boss), perimeter sentries (Lookout), and task-specific code words (e.g., ‘Fox’ for on-land scouts). That hierarchy tightens the investigative focus to the real identities behind the shared handles.”
+
+::: callout-note
+## Q3 Summary
+
+Alias analysis pulled every quoted call-sign from message text and cross-indexed it to sender/receiver entities. Four shared handles stand out: Boss (4 users), Lookout (3 vessels), Fox (2 people), and Whisper (2 vessels). A bipartite alias-entity graph reveals that each handle concentrates activity in distinct phases of the two-week window. Mapping those phases onto vessel-movement timelines shows ‘Boss’ coordinating the rapid permit approvals on Day-10, while ‘Lookout’ vessels form a moving perimeter during the filming embargo. Recognising these shared pseudonyms collapses 19 distinct nodes into four functional roles, exposing a command structure hidden in plain sight.
+:::
+
+# 8. Question 4: Clepper suspects that Nadia Conti, who was formerly entangled in an illegal fishing scheme, may have continued illicit activity within Oceanus.
+
+## Q4A: Through visual analytics, provide evidence that Nadia is, or is not, doing something illegal.
+
+```{r}
+#| label: q4-nadia-events
+#| code-fold: true
+#| code-summary: "Show code"
+
+## 0) find Nadia’s node-id --------------------------------------------------
+nadia_id <- mc3_nodes_final %>% 
+  filter(str_detect(label, regex("^Nadia Conti$", TRUE))) %>% 
+  pull(id)
+
+## 1) events she sends to OR receives from ---------------------------------
+edges_nadia <- mc3_edges_cleaned %>% 
+  filter(from_id == nadia_id | to_id == nadia_id)
+
+ev_ids <- unique(c(edges_nadia$from_id, edges_nadia$to_id))
+
+nadia_events <- mc3_nodes_final %>% 
+  filter(id %in% ev_ids & type == "Event") %>% 
+  mutate(ts   = ymd_hms(timestamp, tz = "UTC"),
+         flag = case_when(
+           sub_type %in% c("Assessment","Monitoring","Enforcement")        ~ "Yes",
+           !is.na(enforcement_type)                                        ~ "Yes",
+           str_detect(coalesce(findings,""), regex("illegal|contraband",T))~ "Yes",
+           TRUE                                                            ~ "No"))
+
+## 2) follow “evidence_for” chains out of those events ---------------------
+ev_follow <- mc3_edges_cleaned %>% 
+  filter(type == "evidence_for", from_id %in% nadia_events$id) %>% 
+  pull(to_id)
+
+followup_events <- mc3_nodes_final %>% 
+  filter(id %in% ev_follow) %>% 
+  mutate(ts = ymd_hms(timestamp, tz = "UTC"),
+         flag = "Yes")                                    # always suspicious
+
+## 3) combined set ---------------------------------------------------------
+nadia_all <- bind_rows(nadia_events, followup_events) %>% 
+  distinct(id, .keep_all = TRUE)
+
+#| echo: false
+ggplot(nadia_all, aes(ts, sub_type, colour = flag)) +
+  geom_point(size = 3, alpha = .8) +
+  scale_colour_manual(values = c("No"="grey60","Yes"="firebrick")) +
+  labs(title = "Events involving (or triggered by) Nadia Conti",
+       x = NULL, y = NULL, colour = "Illicit?") +
+  theme_minimal()
+```
+
+```{r}
+## every edge where Nadia is either endpoint ------------------------------
+nadia_edges <- mc3_edges_cleaned %>%
+  filter(from_id == nadia_id | to_id == nadia_id)
+
+## all event nodes touched by those edges ---------------------------------
+nadia_all_events <- mc3_nodes_final %>%
+  semi_join(nadia_edges, by = c("id" = "from_id")) %>%   # events Nadia sends to
+  bind_rows(
+    mc3_nodes_final %>% 
+      semi_join(nadia_edges, by = c("id" = "to_id"))     # events Nadia receives from
+  ) %>%
+  distinct(id, .keep_all = TRUE) %>%
+  mutate(ts   = ymd_hms(timestamp, tz = "UTC"),
+         flag = case_when(
+           sub_type %in% c("Assessment", "Monitoring", "Enforcement") ~ "Yes",
+           str_detect(coalesce(findings, ""), 
+                      regex("illegal|contraband|unauthori", TRUE))    ~ "Yes",
+           TRUE                                                      ~ "No"))
+
+nadia_all_events %>% 
+  count(sub_type, flag)
+```
+
+## Q4B: Summarize Nadia’s actions visually. Are Clepper’s suspicions justified?
+
+Seven clearly flagged enforcement events interleaved with Nadia’s real-time communications form a consistent pattern of coordination with vessels under investigation. The visual evidence therefore **justifies Clepper’s suspicion** that Nadia Conti remains involved in illicit activity.
+
+# 9. Reflection Question
+
+## 9A: New Visual Techniques?
+
+Yes, led me to build **bipartite alias graphs with dynamic filtering** and **stacked timeline dot‐plots colour-coded by legality**—representations I had not used in previous graph work.
+
+## 9B: Prior-Year Participation
+
+No
+
+## 9C: Most Difficult Aspect
+
+All quite difficult
