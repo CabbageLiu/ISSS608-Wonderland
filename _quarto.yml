@@ -38,7 +38,9 @@ website:
           - text: "Exercise 7A"
             href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_1.qmd
           - text: "Exercise 7B"
-            href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_2.qmd     
+            href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_2.qmd
+          - text: "Exercise 7C"
+            href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_3.qmd                
       - section: "Take-Home Exercise"
         contents:
           - text: "Take-Home Ex01 A"
