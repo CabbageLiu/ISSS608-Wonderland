@@ -19,24 +19,26 @@ website:
             href: Hands-on_Ex/Hands-on_Ex01/Hands-on_Ex01.qmd
           - text: "Exercise 2"
             href: Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02.qmd
-          - text: "Exercise 3a"
+          - text: "Exercise 3A"
             href: Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.qmd
-          - text: "Exercise 3b"
+          - text: "Exercise 3B"
             href: Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03_2.qmd
-          - text: "Exercise 4a"
+          - text: "Exercise 4A"
             href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_1.qmd
-          - text: "Exercise 4b"
+          - text: "Exercise 4B"
             href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_2.qmd
-          - text: "Exercise 4c"
+          - text: "Exercise 4C"
             href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_3.qmd
-          - text: "Exercise 4d"
+          - text: "Exercise 4D"
             href: Hands-on_Ex/Hands-on_Ex04/Hands-on_Ex04_4.qmd
           - text: "Exercise 5"
             href: Hands-on_Ex/Hands-on_Ex05/Hands-on_Ex05.qmd
           - text: "Exercise 6"
             href: Hands-on_Ex/Hands-on_Ex06/Hands-on_Ex06.qmd
-          - text: "Exercise 7"
-            href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_1.qmd          
+          - text: "Exercise 7A"
+            href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_1.qmd
+          - text: "Exercise 7B"
+            href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_2.qmd     
       - section: "Take-Home Exercise"
         contents:
           - text: "Take-Home Ex01 A"

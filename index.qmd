@@ -24,4 +24,4 @@ This page is dedicated for documenting work exercises and notes for ISSS608 Visu
 
 ## Latest Update:
 
-1.  Take Home Ex01 added
+1.  Hands on Ex07 added
