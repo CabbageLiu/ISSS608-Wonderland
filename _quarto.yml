@@ -35,6 +35,8 @@ website:
             href: Hands-on_Ex/Hands-on_Ex05/Hands-on_Ex05.qmd
           - text: "Exercise 6"
             href: Hands-on_Ex/Hands-on_Ex06/Hands-on_Ex06.qmd
+          - text: "Exercise 7"
+            href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_1.qmd          
       - section: "Take-Home Exercise"
         contents:
           - text: "Take-Home Ex01 A"
