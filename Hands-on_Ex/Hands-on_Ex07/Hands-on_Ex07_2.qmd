@@ -41,7 +41,7 @@ Figure below shows the first 15 records of SGPools_svy21.csv. It consists of sev
 
 ![](images/clipboard-3943270373.png)
 
-## 3.1 Data Import and Prep 
+## 3.1 Data Import and Prep
 
 The code chunk below uses *read_csv()* function of **readr**package to import *SGPools_svy21.csv* into R as a tibble data frame called *sgpools*.
 
