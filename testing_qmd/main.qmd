@@ -1,0 +1,4068 @@
+---
+title: "VAST Challenge 2025 - Mini-Challenge 3"
+author: "Liu Chih Yuan"
+date: "June 20, 2025"
+date-modified: "last-modified"
+format: html
+code-fold: true
+code-summary: "Show code"
+execute: 
+  eval: true        # run code 
+  echo: true         # show code 
+  warning: false     #warning msg wont come out
+  freeze: true      #speed up rendering time
+---
+
+# 1. Background
+
+This take home exercise is based on the [VAST Challenge Mini Case 3](https://vast-challenge.github.io/2025/MC3.html)
+
+Over the past decade, the community of Oceanus has faced numerous transformations and challenges evolving from its fishing-centric origins. Following major crackdowns on illegal fishing activities, suspects have shifted investments into more regulated sectors such as the ocean tourism industry, resulting in growing tensions. This increased tourism has recently attracted the likes of international pop star Sailor Shift, who announced plans to film a music video on the island.
+
+Clepper Jessen, a former analyst at FishEye and now a seasoned journalist for the Hacklee Herald, has been keenly observing these rising tensions. Recently, he turned his attention towards the temporary closure of Nemo Reef. By listening to radio communications and utilizing his investigative tools, Clepper uncovered a complex web of expedited approvals and secretive logistics. These efforts revealed a story involving high-level Oceanus officials, Sailor Shift’s team, local influential families, and local conservationist group The Green Guardians, pointing towards a story of corruption and manipulation.
+
+Your task is to develop new and novel visualizations and visual analytics approaches to help Clepper get to the bottom of this story
+
+# 2. Load Package
+
+```{r}
+## Load Libraries
+pacman::p_load(tidyverse, jsonlite, tidygraph, ggraph, lubridate, SmartEDA, igraph, dplyr, viridis, ggrepel, scales)
+
+## Load Graph and Schema
+MC3 <- fromJSON("data/MC3_release/MC3_graph.json")
+MC3_schema <- fromJSON("data/MC3_release/MC3_schema.json")
+
+glimpse(MC3)
+```
+
+# 3. Clean and Transform Data
+
+```{r}
+mc3_nodes <- as_tibble(MC3$nodes)
+mc3_edges <- as_tibble(MC3$edges)
+```
+
+## 3.1 Initial EDA
+
+```{r}
+ExpCatViz(data=mc3_nodes,
+          col="pink")
+```
+
+# 4. Data Cleaning and Wrangling
+
+Code chunk below performs the following data cleaning tasks:
+
+-   convert values in id field into character data type,
+
+-   exclude records with `id` value are na,
+
+-   exclude records with similar id values,
+
+-   exclude `thing_collected` field, and
+
+-   save the cleaned tibble dataframe into a new tibble datatable called `mc3_nodes_cleaned`.
+
+```{r}
+mc3_nodes_cleaned <- mc3_nodes %>%
+  mutate(id = as.character(id)) %>%
+  filter(!is.na(id)) %>%
+  distinct(id, .keep_all = TRUE) %>%
+  select(-thing_collected)
+```
+
+Next, the code chunk below will be used to:
+
+-   rename source and target fields to from_id and to_id respectively,
+
+-   convert values in from_id and to_id fields to character data type,
+
+-   exclude values in from_id and to_id which not found in the id field of mc3_nodes_cleaned,
+
+-   exclude records whereby from_id and/or to_id values are missing, and
+
+-   save the cleaned tibble dataframe and called it mc3_edges_cleaned.
+
+```{r}
+mc3_edges_cleaned <- mc3_edges %>%
+  rename(from_id = source, 
+         to_id = target) %>%
+  mutate(across(c(from_id, to_id), 
+                as.character)) %>%
+  filter(from_id %in% mc3_nodes_cleaned$id, 
+         to_id %in% mc3_nodes_cleaned$id) %>%
+  filter(!is.na(from_id), !is.na(to_id))
+```
+
+Next, code chunk below will be used to create mapping of character id in `mc3_nodes_cleaned` to row index
+
+```{r}
+node_index_lookup <- mc3_nodes_cleaned %>%
+  mutate(.row_id = row_number()) %>%
+  select(id, .row_id)
+```
+
+Next, the code chunk below will be used to join and convert `from_id` and `to_id` to integer indices. At the same time we also drop rows with unmatched nodes.
+
+```{r}
+mc3_edges_indexed <- mc3_edges_cleaned %>%
+  left_join(node_index_lookup, 
+            by = c("from_id" = "id")) %>%
+  rename(from = .row_id) %>%
+  left_join(node_index_lookup, 
+            by = c("to_id" = "id")) %>%
+  rename(to = .row_id) %>%
+  select(from, to, is_inferred, type) %>%
+  filter(!is.na(from) & !is.na(to))  
+```
+
+Next the code chunk below is used to subset nodes to only those referenced by edges.
+
+```{r}
+used_node_indices <- sort(
+  unique(c(mc3_edges_indexed$from, 
+           mc3_edges_indexed$to)))
+
+mc3_nodes_final <- mc3_nodes_cleaned %>%
+  slice(used_node_indices) %>%
+  mutate(new_index = row_number())
+```
+
+We will then use the code chunk below to rebuild lookup from old index to new index.
+
+```{r}
+old_to_new_index <- tibble(
+  old_index = used_node_indices,
+  new_index = seq_along(
+    used_node_indices))
+```
+
+Lastly, the code chunk below will be used to update edge indices to match new node table.
+
+```{r}
+mc3_edges_final <- mc3_edges_indexed %>%
+  left_join(old_to_new_index, 
+            by = c("from" = "old_index")) %>%
+  rename(from_new = new_index) %>%
+  left_join(old_to_new_index, 
+            by = c("to" = "old_index")) %>%
+  rename(to_new = new_index) %>%
+  select(from = from_new, to = to_new, 
+         is_inferred, type)
+```
+
+# 5. Building `tidygraph` object
+
+```{r}
+mc3_graph <- tbl_graph(
+  nodes = mc3_nodes_final,
+  edges = mc3_edges_final,
+  directed = TRUE
+)
+```
+
+```{r}
+str(mc3_graph)
+```
+
+# 6. EDA
+
+Setting seed for reproducibility
+
+```{r}
+set.seed(1818)
+```
+
+## 6.1 Relationship between entities and events
+
+```{r}
+ggraph(mc3_graph, 
+       layout = "fr") +
+  geom_edge_link(alpha = 0.3, 
+                 colour = "gray") +
+  geom_node_point(aes(color = `type`), 
+                  size = 2) +
+  geom_node_text(aes(label = type), 
+                 repel = TRUE, 
+                 size = 2.5) +
+  theme_void()
+```
+
+## 6.2 Entity distribution
+
+```{r}
+# Define color mapping
+subtype_colors <- c(
+  "Person" = "#2ca5ff",
+  "Organization" = "#f5ee15",
+  "Vessel" = "#FB7E81",
+  "Group" = "#25e158",
+  "Location" = "#ec4bff"
+)
+
+mc3_nodes_final %>%
+  filter(type == "Entity") %>%
+  count(sub_type, sort = TRUE) %>%
+  ggplot(aes(x = reorder(sub_type, n), y = n, fill = sub_type)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = n), hjust = -0.1) +
+  labs(title = "Entity Sub-type Distribution", x = "Sub-type", y = "Count") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+## 6.3 Event type distribution
+
+```{r}
+mc3_nodes_final %>%
+  filter(type == "Event") %>%
+  count(sub_type, sort = TRUE) %>%
+  ggplot(aes(x = reorder(sub_type, n), y = n, fill = sub_type)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = n), hjust = -0.1) +
+  labs(title = "Event Sub-type Distribution", x = "Sub-type", y = "Count") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+## 6.4 List of communication participants
+
+```{r}
+library(DT)
+
+# Step 1: Get all Communication Event IDs
+comm_event_ids <- mc3_nodes_cleaned %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  pull(id)
+
+# Step 2: Extract 'sent' edges for communication events
+comm_sent_edges <- mc3_edges_cleaned %>%
+  filter(type == "sent", to_id %in% comm_event_ids) %>%
+  select(comm_id = to_id, sender_id = from_id)
+
+# Step 3: Extract 'received' edges for same communication events
+comm_received_edges <- mc3_edges_cleaned %>%
+  filter(type == "received", from_id %in% comm_event_ids) %>%
+  select(comm_id = from_id, receiver_id = to_id)
+
+# Step 4: Join sent and received edges by communication ID
+comm_pairs <- comm_sent_edges %>%
+  inner_join(comm_received_edges, by = "comm_id")
+
+# Step 5: Add sender and receiver labels
+participants_named <- comm_pairs %>%
+  left_join(mc3_nodes_cleaned %>% select(id, sender_label = label), by = c("sender_id" = "id")) %>%
+  left_join(mc3_nodes_cleaned %>% select(id, receiver_label = label), by = c("receiver_id" = "id"))
+
+
+
+# Step7: Interactive summary of top sender–receiver pairs
+participants_named %>%
+  count(sender_label, receiver_label, sort = TRUE) %>%
+  datatable(
+    caption = "Top Communication Pairs (Sender → Receiver)",
+    colnames = c("Sender", "Receiver", "Message Count"),
+    options = list(pageLength = 10, autoWidth = TRUE),
+    rownames = FALSE
+  )
+```
+
+## 6.4.1 Visualization of communication participants network
+
+This code creates an **interactive communication network graph** using `visNetwork`, where:
+
+-   Each **node** represents a person or entity, **node size** is based on total messages **sent** by that participant.
+
+-   Each **edge (arrow)** represents a communication sent from one participant to another, the thicker the edge, the more message sent to that particular receiver.
+
+**Ver 1: Layout_in_circle**
+
+```{r}
+library(visNetwork)
+
+# Step 1: Summarize communication edges
+comm_edges_vis <- participants_named %>%
+  count(sender_id, receiver_id, sort = TRUE) %>%
+  rename(from = sender_id, to = receiver_id, value = n)
+
+# Step 2: Compute messages sent per node
+message_counts <- comm_edges_vis %>%
+  group_by(from) %>%
+  summarise(sent_count = sum(value), .groups = "drop")
+
+# Step 3: Prepare nodes, merge with message count and add color/shape
+nodes_vis <- mc3_nodes_cleaned %>%
+  filter(id %in% unique(c(comm_edges_vis$from, comm_edges_vis$to))) %>%
+  select(id, label, sub_type) %>%
+  left_join(message_counts, by = c("id" = "from")) %>%
+  mutate(
+    sent_count = replace_na(sent_count, 0),
+    size = rescale(sent_count, to = c(10, 40)),
+    title = paste0(label, "<br>Sub-type: ", sub_type,
+                   ifelse(!is.na(sent_count), paste0("<br>Sent: ", sent_count, " messages"), "")),
+    color = case_when(
+      sub_type == "Person" ~ "#2ca5ff",
+      sub_type == "Organization" ~ "#f5ee15",
+      sub_type == "Vessel" ~ "#FB7E81",
+      sub_type == "Group" ~ "#25e158",
+      sub_type == "Location" ~ "#ec4bff",
+      TRUE ~ "black"
+    ),
+    shape = case_when(
+      sub_type == "Person" ~ "dot",
+      sub_type == "Organization" ~ "square",
+      sub_type == "Vessel" ~ "triangle",
+      sub_type == "Group" ~ "star",
+      sub_type == "Location" ~ "diamond",
+      TRUE ~ "dot"
+    ),
+  ) %>%
+  arrange(desc(size))
+
+# Step 4: Format visNetwork edges
+edges_vis <- comm_edges_vis %>%
+  mutate(
+    arrows = "to",
+    width = rescale(value, to = c(1, 6)),
+    title = paste("Messages:", value)
+  )
+
+# Step 5: Define legend items
+legend_nodes <- data.frame(
+  label = c("Person", "Organization", "Vessel", "Group", "Location"),
+  color = c("#2ca5ff", "#f5ee15", "#FB7E81", "#25e158", "#ec4bff"),
+  shape = c("dot", "square", "triangle", "star", "diamond"),
+  stringsAsFactors = FALSE
+)
+
+# Step 6: Render network with legend
+visNetwork(nodes_vis, edges_vis, width = "100%", height = "1000px") %>%
+  visNodes(
+    size = nodes_vis$size
+    # color and shape are picked up from nodes_vis columns automatically
+  ) %>%
+  visLegend(
+    addNodes = lapply(1:nrow(legend_nodes), function(i) {
+      list(
+        label = legend_nodes$label[i],
+        shape = legend_nodes$shape[i],
+        color = legend_nodes$color[i]
+      )
+    }),
+    useGroups = FALSE,
+    width = 0.15
+  ) %>%
+  visEdges(smooth = FALSE) %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visIgraphLayout(layout = "layout_in_circle") %>%
+  visPhysics(enabled = FALSE) %>%
+  visLayout(randomSeed = 1818)
+```
+
+**Ver 2: Layout_on_sphere**
+
+From this plot, it reveals that some pairs (e.g., Miranda Jordan and Clepper Jensen) mainly communicate with each other, suggesting isolated or private channels outside the broader network.
+
+```{r}
+library(visNetwork)
+
+# Step 1: Summarize communication edges
+comm_edges_vis <- participants_named %>%
+  count(sender_id, receiver_id, sort = TRUE) %>%
+  rename(from = sender_id, to = receiver_id, value = n)
+
+# Step 2: Compute messages sent per person (by sender)
+message_counts <- comm_edges_vis %>%
+  group_by(from) %>%
+  summarise(sent_count = sum(value), .groups = "drop")
+
+# Step 3: Prepare nodes with label, subtype, color, shape, and scaled size
+nodes_vis <- mc3_nodes_cleaned %>%
+  filter(id %in% unique(c(comm_edges_vis$from, comm_edges_vis$to))) %>%
+  select(id, label, sub_type) %>%
+  left_join(message_counts, by = c("id" = "from")) %>%
+  mutate(
+    size = if_else(
+      sub_type == "Person",
+      rescale(sent_count, to = c(10, 40), na.rm = TRUE),
+      15
+    ),
+    title = paste0(label, "<br>Sub-type: ", sub_type,
+                   ifelse(!is.na(sent_count), paste0("<br>Sent: ", sent_count, " messages"), "")),
+    color = case_when(
+      sub_type == "Person" ~ "#2ca5ff",
+      sub_type == "Organization" ~ "#f5ee15",
+      sub_type == "Vessel" ~ "#FB7E81",
+      sub_type == "Group" ~ "#25e158",
+      sub_type == "Location" ~ "#ec4bff",
+      TRUE ~ "black"
+    ),
+    shape = case_when(
+      sub_type == "Person" ~ "dot",
+      sub_type == "Organization" ~ "square",
+      sub_type == "Vessel" ~ "triangle",
+      sub_type == "Group" ~ "star",
+      sub_type == "Location" ~ "diamond",
+      TRUE ~ "dot"
+    )
+  )
+
+# Step 4: Format edges
+edges_vis <- comm_edges_vis %>%
+  mutate(
+    arrows = "to",
+    width = rescale(value, to = c(1, 6)),
+    title = paste("Messages:", value)
+  )
+
+# Step 5: Legend mapping
+legend_nodes <- data.frame(
+  label = c("Person", "Organization", "Vessel", "Group", "Location"),
+  color = c("#2ca5ff", "#f5ee15", "#FB7E81", "#25e158", "#ec4bff"),
+  shape = c("dot", "square", "triangle", "star", "diamond"),
+  stringsAsFactors = FALSE
+)
+
+# Step 6: Render the network with layout_on_sphere and legend
+visNetwork(nodes_vis, edges_vis, width = "100%", height = "900px") %>%
+  visNodes(
+    size = nodes_vis$size
+    # color and shape columns are automatically used
+  ) %>%
+  visLegend(
+    addNodes = lapply(1:nrow(legend_nodes), function(i) {
+      list(
+        label = legend_nodes$label[i],
+        shape = legend_nodes$shape[i],
+        color = legend_nodes$color[i]
+      )
+    }),
+    useGroups = FALSE,
+    width = 0.15
+  ) %>%
+  visEdges(smooth = FALSE) %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visIgraphLayout(layout = "layout_on_sphere") %>%
+  visPhysics(enabled = FALSE) %>%
+  visLayout(randomSeed = 1818)
+```
+
+# 7 - Task 1a & 1b: Daily Temporal Patterns in Communications over the Two Weeks 🎯
+
+## VAST Challenge Task & Question 1a and 1b
+
+Clepper found that messages frequently came in at around the same time each day.
+
+-   Develop a graph-based visual analytics approach to identify any daily temporal patterns in communications.
+-   How do these patterns shift over the two weeks of observations?
+
+**Objective**
+
+1.  Identify **when** communications happen most often during each day.
+2.  Detect **shifts in these patterns** over the 2-week period.
+3.  Later: Focus on a **specific entity** (e.g., Nadia Conti) and explore **who influences them**.
+
+### Step 1: Extract & Parse Communication Event Timestamps
+
+Extract the Communication Timestamps from `mc3_nodes_final` and filter for communication events.
+
+```{r}
+
+# Filter for Communication events
+comm_events <- mc3_nodes_final %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  mutate(timestamp = ymd_hms(timestamp)) %>%
+  filter(!is.na(timestamp)) %>%
+  mutate(
+    day = as.Date(timestamp),
+    hour = hour(timestamp)
+  )
+```
+
+Parse the Communication Timestamp into the format "dd/mm/yyy (ddd)" for ease of reference.
+
+```{r}
+
+# Communication events with parsed date and time
+comm_events <- mc3_nodes_final %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  mutate(timestamp = ymd_hms(timestamp)) %>%
+  filter(!is.na(timestamp)) %>%
+  mutate(
+    hour = hour(timestamp),
+    date_label = format(timestamp, "%d/%m/%Y (%a)")  # e.g., "19/03/2040 (Tue)"
+  )
+
+```
+
+### Step 2: Visualize the Communication Volume for Analysis
+
+#### **2.1 - Bar Plot of daily communication volume over the 2 weeks period:**
+
+```{r}
+#| code-fold: true
+
+# Step 1: Prepare daily message volume data
+daily_message_volume <- mc3_nodes_final %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  mutate(
+    timestamp = ymd_hms(timestamp),
+    date = as.Date(timestamp),
+    date_label = format(timestamp, "%d/%m/%Y (%a)")
+  ) %>%
+  group_by(date, date_label) %>%
+  summarise(message_count = n(), .groups = "drop") %>%
+  arrange(date)
+
+# Step 2: Compute average and total message count
+avg_msg_count <- mean(daily_message_volume$message_count)
+total_msg_count <- sum(daily_message_volume$message_count)
+
+# Step 3: Plot bar chart with average + total labels
+ggplot(daily_message_volume, aes(x = date_label, y = message_count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text(
+    aes(label = message_count),
+    vjust = -0.3,
+    size = 2.5,
+    color = "grey40"
+  ) +
+  geom_hline(yintercept = avg_msg_count, color = "red", linetype = "dashed", size = 1.2) +
+  annotate(
+    "label", x = 1, y = avg_msg_count + 2,
+    label = paste("Average =", round(avg_msg_count, 1)),
+    color = "red", fill = "grey90",
+    label.size = 0, hjust = -0.2, vjust = 3
+  ) +
+  annotate(
+    "label", x = nrow(daily_message_volume), y = max(daily_message_volume$message_count) + 5,
+    label = paste("Total =", total_msg_count),
+    color = "black", fill = "lightgrey",
+    label.size = 0.3, hjust = 1.1, vjust = 1
+  ) +
+  labs(
+    title = "Daily Radio Communication Volume",
+    x = "Date",
+    y = "Message Count"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+```
+
+#### **2.2 - Interactive Table of daily communication volume variation(message count)**
+
+```{r}
+#| code-fold: true
+library(DT)
+
+# Daily message volume with comparisons
+daily_message_volume <- mc3_nodes_final %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  mutate(
+    timestamp = ymd_hms(timestamp),
+    date = as.Date(timestamp),
+    date_label = format(timestamp, "%d/%m/%Y (%a)")
+  ) %>%
+  group_by(date, date_label) %>%
+  summarise(message_count = n(), .groups = "drop") %>%
+  arrange(date) %>%
+  mutate(
+    change_from_prev = message_count - lag(message_count),
+    pct_change_from_prev = round((message_count - lag(message_count)) / lag(message_count) * 100, 2)
+  )
+
+datatable(
+  daily_message_volume %>% select(-date),  # remove raw date if not needed
+  caption = "Daily Message Volume with Day-over-Day Change",
+  options = list(pageLength = 14, order = list(list(0, 'asc'))),
+  rownames = FALSE
+)
+
+```
+
+#### **2.3a - Heat Map of hourly message volume for each day over the 2 weeks period:**
+
+This heat map is interactive and you may choose to hover on the tile to display the **date, time, and message count**
+
+```{r}
+#| code-fold: true
+
+library(forcats)
+library(plotly)
+
+# Step 1: Reconstruct sender–receiver–timestamp structure
+comm_events_raw <- mc3_nodes_final %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  select(event_id = id, timestamp) %>%
+  mutate(timestamp = ymd_hms(timestamp),
+         hour = hour(timestamp),
+         date_label = format(timestamp, "%d/%m/%Y (%a)"))
+
+# Step 2: Get sender (sent) and receiver (received) links
+comm_edges_sent <- mc3_edges_cleaned %>%
+  filter(type == "sent") %>%
+  select(event_id = to_id, sender_id = from_id)
+
+comm_edges_recv <- mc3_edges_cleaned %>%
+  filter(type == "received") %>%
+  select(event_id = from_id, receiver_id = to_id)
+
+# Step 3: Join all together into sender–receiver–timestamp
+comm_links <- comm_events_raw %>%
+  left_join(comm_edges_sent, by = "event_id") %>%
+  left_join(comm_edges_recv, by = "event_id") %>%
+  left_join(mc3_nodes_cleaned %>% select(sender_id = id, sender_label = label), by = "sender_id") %>%
+  left_join(mc3_nodes_cleaned %>% select(receiver_id = id, receiver_label = label), by = "receiver_id")
+
+# Step 4: Aggregate total messages per hour/day
+comm_heatmap <- comm_links %>%
+  group_by(date_label, hour) %>%
+  summarise(
+    count = n(),
+    top_sender = names(sort(table(sender_label), decreasing = TRUE))[1],
+    sender_count = max(table(sender_label)),
+    top_receiver = names(sort(table(receiver_label), decreasing = TRUE))[1],
+    receiver_count = max(table(receiver_label)),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    tooltip = paste0(
+      "📅 Date: ", date_label,
+      "<br>⏰ Hour: ", sprintf("%02d:00", hour),
+      "<br>📨 Messages: ", count,
+      "<br>🔴 Top Sender: ", top_sender, " (", sender_count, ")",
+      "<br>🟢 Top Receiver: ", top_receiver, " (", receiver_count, ")"
+    )
+  )
+
+# Step 5: Static ggplot
+p <- ggplot(comm_heatmap, aes(
+  x = hour,
+  y = fct_rev(factor(date_label)),
+  fill = count,
+  text = tooltip
+)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "inferno", direction = -1, name = "Message Count") +
+  scale_x_continuous(
+    breaks = 0:23,
+    labels = function(x) sprintf("%02d:00", x)
+  ) +
+  labs(
+    title = "Hourly Heatmap of Radio Communications by Day",
+    x = "Hour of Day",
+    y = NULL
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank()
+  )
+
+# Step 6: Make interactive
+ggplotly(p, tooltip = "text")
+
+```
+
+We will increase the resolution to half-hour time slots.
+
+#### **2.4b - Heat Map of half-hourly message volume for each day over the 2 weeks period:**
+
+This heat map is interactive and you may choose to hover on the tile to display the **date, time, and message count**.
+
+```{r}
+#| code-fold: true
+
+library(forcats)
+library(plotly)
+
+# Step 1: Fix sender and receiver edges
+comm_edges_sent <- mc3_edges_cleaned %>%
+  filter(type == "sent") %>%
+  select(event_id = to_id, sender_id = from_id)
+
+comm_edges_recv <- mc3_edges_cleaned %>%
+  filter(type == "received") %>%
+  select(event_id = from_id, receiver_id = to_id)  # ✅ fixed receiver_id
+
+# Step 2: Reconstruct sender–receiver–event linkage
+comm_events_raw <- mc3_nodes_final %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  select(event_id = id, timestamp) %>%
+  mutate(
+    timestamp = ymd_hms(timestamp),
+    hour = hour(timestamp),
+    minute = minute(timestamp),
+    time_bin = hour + ifelse(minute < 30, 0, 0.5),
+    date_label = format(timestamp, "%d/%m/%Y (%a)"),
+    time_label = sprintf("%02d:%02d", floor(time_bin), ifelse(time_bin %% 1 == 0, 0, 30))
+  )
+
+# Step 3: Join to get sender/receiver labels
+comm_links <- comm_events_raw %>%
+  left_join(comm_edges_sent, by = "event_id") %>%
+  left_join(comm_edges_recv, by = "event_id") %>%
+  left_join(mc3_nodes_cleaned %>% select(id, sender_label = label), by = c("sender_id" = "id")) %>%
+  left_join(mc3_nodes_cleaned %>% select(id, receiver_label = label), by = c("receiver_id" = "id"))
+
+# Step 4: Aggregate by half-hour + label top actors
+comm_heatmap <- comm_links %>%
+  group_by(date_label, time_bin, time_label) %>%
+  summarise(
+    count = n(),
+    top_sender = names(sort(table(sender_label), decreasing = TRUE))[1],
+    sender_count = max(table(sender_label)),
+    top_receiver = names(sort(table(receiver_label), decreasing = TRUE))[1],
+    receiver_count = max(table(receiver_label)),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    tooltip = paste0(
+      "📅 Date: ", date_label,
+      "<br>🕒 Time: ", time_label,
+      "<br>📨 Messages: ", count,
+      "<br>🔴 Top Sender: ", top_sender, " (", sender_count, ")",
+      "<br>🟢 Top Receiver: ", top_receiver, " (", receiver_count, ")"
+    )
+  )
+
+# Step 5: ggplot
+p <- ggplot(comm_heatmap, aes(x = time_bin, y = fct_rev(factor(date_label)), fill = count, text = tooltip)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(
+    option = "inferno",
+    direction = -1,
+    name = "Message Count"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  labs(
+    title = "Half-Hourly Heatmap of Radio Communications by Day",
+    x = "Time of Day",
+    y = NULL
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank()
+  )
+
+# Step 6: Convert to interactive Plotly plot
+ggplotly(p, tooltip = "text")
+```
+
+#### **2.4c - Density plot of Daily half-hourly message volume over the 2 weeks period:**
+
+The faceted density plot that shows the **distribution of communication events by time of day**, broken down for each day in the dataset. It helps to visually detect **temporal communication patterns**, intensity, and consistency over multiple days.
+
+::: panel-tabset
+### Overview of the 2 week period
+
+```{r}
+#| code-fold: true
+# Step 1: Preprocess communication events
+comm_events <- mc3_nodes_final %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  mutate(timestamp = ymd_hms(timestamp)) %>%
+  filter(!is.na(timestamp)) %>%
+  mutate(
+    date_label = format(timestamp, "%d/%m/%Y (%a)"),
+    hour = hour(timestamp),
+    minute = minute(timestamp),
+    time_bin = hour + ifelse(minute < 30, 0, 0.5)
+  )
+
+# Step 2: Summarise daily medians and counts
+daily_stats <- comm_events %>%
+  group_by(date_label) %>%
+  summarise(
+    median_time = median(time_bin),
+    msg_count = n(),
+    .groups = "drop"
+  )
+
+# Step 3: Plot
+ggplot(comm_events, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = daily_stats, aes(xintercept = median_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(
+    data = daily_stats,
+    aes(x = 20.5, y = 0.25, label = paste("Total:", msg_count)),
+    inherit.aes = FALSE,
+    size = 3,
+    color = "grey20",
+    hjust = 1
+  ) +
+  facet_wrap(~ date_label, ncol = 4) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = NULL  # suppress all x-axis labels
+  ) +
+  labs(
+    title = "Daily Communication Patterns (Half-Hourly)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+```
+
+### Day 1 - 01/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "01/10/2040 (Mon)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 2 - 02/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "02/10/2040 (Tue)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 3 - 03/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "03/10/2040 (Wed)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 4 - 04/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "04/10/2040 (Thu)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 5 - 05/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "05/10/2040 (Fri)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 6 - 06/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "06/10/2040 (Sat)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 7 - 07/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "07/10/2040 (Sun)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 8 - 08/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "08/10/2040 (Mon)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 9 - 09/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "09/10/2040 (Tue)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 10 - 10/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "10/10/2040 (Wed)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 11 - 11/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "11/10/2040 (Thu)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 12 - 12/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "12/10/2040 (Fri)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 13 - 13/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "13/10/2040 (Sat)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+
+### Day 14 - 14/10/2040
+
+```{r}
+#| code-fold: true
+
+# Filter for selected date
+daily_data <- filter(comm_events, date_label == "14/10/2040 (Sun)")
+
+# Build density data to find full curve
+density_data <- ggplot_build(
+  ggplot(daily_data, aes(x = time_bin)) +
+    geom_density()
+)$data[[1]]
+
+# Identify peaks within ±10% of the maximum density
+max_y <- max(density_data$y)
+peak_threshold <- 0.9 * max_y
+
+major_peaks <- density_data %>%
+  filter(y >= peak_threshold) %>%
+  group_by(grp = cumsum(c(1, diff(x) > 0.5))) %>%  # group close bins
+  summarise(
+    peak_time = x[which.max(y)],
+    peak_density = max(y),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("Peak: %02d:%02d",
+                    floor(peak_time),
+                    ifelse(peak_time %% 1 == 0, 0, 30))
+  )
+
+# Message count
+msg_count <- nrow(daily_data)
+
+# Final plot
+ggplot(daily_data, aes(x = time_bin)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = major_peaks, aes(xintercept = peak_time),
+             color = "red", linetype = "dashed", linewidth = 0.6) +
+  geom_text(data = major_peaks,
+            aes(x = peak_time, y = 0.23, label = label),
+            color = "red", size = 3.5, hjust = -0.1, inherit.aes = FALSE) +
+  annotate("text", x = 20.5, y = 0.25,
+           label = paste("Total messages communicated:", msg_count),
+           hjust = 1, size = 4, color = "grey30") +
+  labs(
+    title = "Half-Hourly Communication Density (Multiple Peaks Highlighted)",
+    x = "Time of Day",
+    y = "Density"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23.5, by = 0.5),
+    labels = function(x) sprintf("%02d:%02d", floor(x), ifelse(x %% 1 == 0, 0, 30))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+
+```
+:::
+
+📈 **Insights This Visualization Offers**
+
+### Step 3: Plot Combined Hourly and Half-hourly Communication Volume
+
+**Bar Plot of combined hourly message volume over the 2 weeks period:**
+
+```{r}
+#| code-fold: true
+
+# Prepare data
+comm_hourly <- comm_events %>%
+  count(hour) %>%
+  mutate(
+    hour_label = sprintf("%02d:00", hour),  # Format to hh:mm
+    percent = n / sum(n)
+  )
+
+# Plot
+ggplot(comm_hourly, aes(x = hour_label, y = n)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text_repel(
+    aes(label = paste0(n, " (", percent(percent, accuracy = 1), ")")),
+    nudge_y = 3,
+    size = 2.5,
+    direction = "y",
+    max.overlaps = Inf
+  ) +
+  labs(
+    title = "Overall Hourly Communication Volume",
+    x = "Time of Day (hh:mm)",
+    y = "Message Count"
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+```
+
+**Bar Plot of combined half-hourly message volume in the 2 weeks period.**
+
+```{r}
+#| code-fold: true
+
+comm_events <- mc3_nodes_final %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  mutate(timestamp = ymd_hms(timestamp)) %>%
+  filter(!is.na(timestamp)) %>%
+  mutate(
+    hour = hour(timestamp),
+    minute = minute(timestamp),
+    time_bin = sprintf("%02d:%02d", hour, ifelse(minute < 30, 0, 30))
+  )
+
+comm_halfhour <- comm_events %>%
+  count(time_bin) %>%
+  mutate(percent = n / sum(n))
+
+ggplot(comm_halfhour, aes(x = time_bin, y = n)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text_repel(
+    aes(label = paste0(n, " (", percent(percent, accuracy = 1), ")")),
+    nudge_y = 3,
+    size = 2.5,
+    direction = "y",
+    max.overlaps = Inf
+  ) +
+  labs(
+    title = "Overall Half-Hourly Communication Volume",
+    x = "Time of Day (hh:mm)",
+    y = "Message Count"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+```
+
+::: callout-tip
+## 1a. What are the identifiable daily temporal patterns in communications?
+
+1.  The daily communication volume fluctuates slightly between 34 and 49 messages, with an average of approximately 42 messages per day, highlighting a stable overall activity level. Notably, the highest volume occurs on 11th October (49 messages), immediately following the lowest volume the day before on 10th October (34 messages)—a sharp rebound that may signal a response to specific events or operational needs. Despite these fluctuations, the system maintains a consistent tempo across the two weeks.
+
+2.  The temporal analysis using both the heat map and time series plots reveals a pronounced morning-centric communication rhythm. The vast majority of radio traffic is concentrated between 9:00 AM and 11:30 AM, with the most intense peaks typically occurring between 10:00 and 11:00 AM. With reference to the Density plot of Daily half-hourly message volume, of the 14 days, we see message density peaks at 10:30 AM on 9 days, while on 3 days, it peaks at 12:30 PM.
+
+3.  For instance if we were to based in on the hourly plot, 5th October (Fri) and 11th October (Thu) both register their highest single-hour counts at 10:00 AM at 24 and 21 messages respectively. Communication activity drops off steeply after lunchtime, with more than 90% of the days showing little to no activity after 2:30 PM. This pattern suggests a highly structured daily workflow, where key decisions and coordination are front-loaded in the day. Importantly, the hourly heat map also indicates that this routine holds across both weekdays and weekends—communication volumes and peak hours remain similar, underlining the operational regularity of the group regardless of the day of week.
+:::
+
+::: callout-tip
+## 1b. How do these patterns shift over the two weeks of observations?
+
+1.  Over the two-week period, while the timing and structure of communication peaks remain broadly consistent, there are subtle shifts in both intensity and timing. Some days, such as 3rd, 5th, 11th and 12th October, see particularly high spikes in the mid-morning, which may correspond to critical events, decision points, or heightened urgency. The sharp dip on October 8th and 13th, immediately after a period of "surge" (3rd - 7th and 9th to 12th October), points to possible responses to interruptions, lulls, or triggering incidents. Overall, although the daily messaging routine is remarkably stable, these bursts and brief lulls provide clues to changing circumstances or stress points in the operation—an analytical signal that warrants closer inspection of event logs or external triggers for those dates.
+
+2.  Another notable change in the communication pattern is observed during the weekends. In the first week, weekend communication peaks occurred earlier, typically between 10:00 AM and 11:30 AM, closely mirroring the weekday rhythm. However, in the second week, the weekend peaks shifted noticeably later, with the highest message volumes concentrated around 12:00 PM and 1:00 PM. This shift not only marks a departure from the otherwise stable early-morning communication structure but also suggests an adaptive or reactive operational schedule—potentially in response to evolving events, increased coordination needs, or changing priorities as the observation period progressed. The contrast between the two weekends is clear in the heatmap, underscoring the importance of monitoring such shifts as possible indicators of underlying changes in group behavior or external pressures.
+:::
+
+# 8. - Task 1c: Focus on a Particular Entity - "Nadia Conti"
+
+## VAST Challenge Task & Question 1c
+
+Clepper found that messages frequently came in at around the same time each day.
+
+1.  Focus on a specific entity and use this information to determine who has influence over them.
+
+### 3.1 **-** Data Preparation for "Nadia Conti" Influence Analysis
+
+We first extracted the relevant communication edges from the dataset, pairing “sent” and “received” communication events to form entity-to-entity links. We retained only those edges where both nodes represent real-world entities (Person, Organization, Vessel, Group, or Location), ensuring that our analysis focuses on the meaningful actors in the Oceanus network.
+
+```{r}
+#| code-fold: true
+
+# Extract sent and received communication event edges
+sent_edges <- mc3_edges_cleaned %>%
+  filter(type == "sent") %>%
+  select(source_entity = from_id, event = to_id)
+
+received_edges <- mc3_edges_cleaned %>%
+  filter(type == "received") %>%
+  select(event = from_id, target_entity = to_id)
+
+# Pair sent and received to form communication edges
+paired_edges <- sent_edges %>%
+  inner_join(received_edges, by = "event") %>%
+  select(from = source_entity, to = target_entity)
+
+# Add unmatched sent and received edges (optional, for completeness)
+single_sent_edges <- sent_edges %>%
+  select(from = source_entity, to = event)
+single_received_edges <- received_edges %>%
+  select(from = event, to = target_entity)
+
+all_edges <- bind_rows(paired_edges, single_sent_edges, single_received_edges) %>%
+  distinct()
+
+# Identify entity nodes (Person, Organization, Vessel, Group, Location)
+entity_ids <- mc3_nodes_cleaned %>%
+  filter(sub_type %in% c("Person", "Organization", "Vessel", "Group", "Location")) %>%
+  pull(id) %>% as.character()
+
+entity_edges <- all_edges %>%
+  filter(as.character(from) %in% entity_ids, as.character(to) %in% entity_ids)
+
+entity_nodes <- mc3_nodes_cleaned %>%
+  filter(sub_type %in% c("Person", "Organization", "Vessel", "Group", "Location")) %>%
+  select(id, label, sub_type)
+
+```
+
+### 3.2 **-** Build the Global Network and Compute Centrality
+
+Using these cleaned and filtered edges and nodes, we built a global directed graph representing the Oceanus community. We then computed key network centrality metrics for each node—PageRank, betweenness, and degree—quantifying the influence and connectivity of every entity in the overall network.
+
+```{r}
+#| code-fold: true
+library(igraph)
+
+g <- graph_from_data_frame(d = entity_edges, vertices = entity_nodes, directed = TRUE)
+
+# Compute centralities
+V(g)$pagerank <- page_rank(g)$vector
+V(g)$betweenness <- betweenness(g)
+V(g)$degree <- degree(g)
+
+```
+
+### 3.3 **-** Extract "Nadia Conti" Ego Network (2-hop Neighbourhood)
+
+Focusing on "Nadia Conti", we identified her node and extracted her two-step ego network, capturing both direct and indirect connections within the broader network. This local subgraph reveals Nadia’s immediate sphere of influence and the key players connected to her.
+
+```{r}
+#| code-fold: true
+nadia_label <- "Nadia Conti"
+target_index <- which(V(g)$label == nadia_label)
+
+ego_graph <- make_ego_graph(g, order = 2, nodes = target_index, mode = "all")[[1]]
+
+```
+
+### 3.4 **-** Visualize Nadia Conti’s Ego Network (Interactive)
+
+We visualized Nadia’s ego network using node size, shape, and color to represent centrality and entity type. We also summarized centrality metrics in clear tables, ranking all ego network members by PageRank, Betweenness, and Degree. This allows for direct identification of the most influential, best-connected, and most strategic actors in Nadia Conti’s communication environment.
+
+```{r}
+#| code-fold: true
+
+nodes_df <- data.frame(
+  id = V(ego_graph)$name,
+  label = V(ego_graph)$label,
+  group = V(ego_graph)$sub_type,
+  title = paste0("<b>", V(ego_graph)$label, "</b><br>",
+                 "Degree: ", round(V(ego_graph)$degree, 2), "<br>",
+                 "Betweenness: ", round(V(ego_graph)$betweenness, 2), "<br>",
+                 "PageRank: ", round(V(ego_graph)$pagerank, 4)),
+  shape = ifelse(V(ego_graph)$sub_type == "Person", "dot",
+                 ifelse(V(ego_graph)$sub_type == "Organization", "square",
+                        ifelse(V(ego_graph)$sub_type == "Vessel", "triangle",
+                               ifelse(V(ego_graph)$sub_type == "Group", "star", "diamond")))),
+  value = V(ego_graph)$pagerank * 30 + 5
+)
+
+edges_df <- as_data_frame(ego_graph, what = "edges") %>%
+  rename(from = from, to = to)
+
+library(visNetwork)
+visNetwork(nodes_df, edges_df, width = "100%", height = "700px") %>%
+  visNodes(scaling = list(min = 5, max = 30)) %>%
+  visEdges(
+    arrows = list(to = list(enabled = TRUE, scaleFactor = 0.3)),
+    color = list(color = "gray")
+  ) %>%
+  visOptions(
+    highlightNearest = TRUE,
+    nodesIdSelection = TRUE,
+    manipulation = FALSE
+  ) %>%
+  visInteraction(
+    dragNodes = FALSE,
+    dragView = FALSE,
+    zoomView = FALSE
+  ) %>%
+  visLegend() %>%
+  visLayout(randomSeed = 1818)
+
+```
+
+## Global and Ego-Network Structure
+
+The overview network visualization reveals that **Nadia Conti** is centrally embedded in the Oceanus communication web, maintaining direct and indirect connections with major actors such as Neptune (Vessel), V. Miesel Shipping (Organization), Elise (Person), and others. The use of color and shape coding in the network allows for quick identification of the different types of entities in Nadia’s influence neighborhood.
+
+### 3.5 **-** Centrality Tables for Nadia’s Ego Network
+
+On both the global and Nadia-focused ego networks, we computed standard network centrality metrics for all nodes:
+
+-   **PageRank** (overall influence),
+-   **Betweenness** (information brokerage/intermediary role), and
+-   **Degree** (number of direct connections).
+
+These measures quantify the importance and structural roles of each entity relative to Nadia and the broader community.
+
+```{r}
+#| code-fold: true
+
+# PageRank table
+pagerank_df <- data.frame(
+  label = V(ego_graph)$label,
+  sub_type = V(ego_graph)$sub_type,
+  pagerank = round(V(ego_graph)$pagerank, 4)
+) %>% arrange(desc(pagerank))
+
+# Betweenness table
+betweenness_df <- data.frame(
+  label = V(ego_graph)$label,
+  sub_type = V(ego_graph)$sub_type,
+  betweenness = round(V(ego_graph)$betweenness, 2)
+) %>% arrange(desc(betweenness))
+
+# Degree table
+degree_df <- data.frame(
+  label = V(ego_graph)$label,
+  sub_type = V(ego_graph)$sub_type,
+  degree = V(ego_graph)$degree
+) %>% arrange(desc(degree))
+
+
+```
+
+```{r}
+knitr::kable(pagerank_df, caption = "PageRank Centrality (Nadia's Ego Network)")
+```
+
+```{r}
+knitr::kable(betweenness_df, caption = "Betweenness Centrality (Nadia's Ego Network)")
+```
+
+```{r}
+knitr::kable(degree_df, caption = "Degree Centrality (Nadia's Ego Network)")
+```
+
+## Centrality Metrics and Direct & Indirect Influences
+
+By calculating centrality metrics within Nadia’s two-hop ego network, we observe that the most influential nodes in her environment—by PageRank, betweenness, and degree—are Neptune, V. Miesel Shipping, and Elise. Nadia herself consistently ranks among the top nodes by these measures, highlighting her role as both an influencer and an information bridge. Entities such as Neptune and V. Miesel Shipping, which also score highly in centrality, exert considerable influence over Nadia’s information flow and access to other parts of the network.
+
+Degree centrality analysis shows Nadia maintains multiple direct connections, particularly with other highly active nodes, ensuring she is closely linked to key hubs in the network. Betweenness centrality further reveals that Nadia is not only well-connected but also acts as an important intermediary, facilitating communication between otherwise distant parts of the network. PageRank confirms that her immediate environment is composed of actors with significant structural power, increasing the likelihood that Nadia is both influenced by, and exerts influence upon, the most pivotal players in Oceanus.
+
+#### **3.5.1 - PageRank for Nadia Conti**
+
+```{r}
+#| code-fold: true
+
+library(igraph)
+library(visNetwork)
+
+# -- Build the global network g as in your earlier code (using your entity_nodes/entity_edges) --
+
+g <- graph_from_data_frame(
+  d = entity_edges, 
+  vertices = entity_nodes, 
+  directed = TRUE
+)
+
+# -- Get Nadia's index in g --
+nadia_label <- "Nadia Conti"
+target_index <- which(V(g)$label == nadia_label)
+
+# -- Extract Nadia's 1-hop ego network (all direct neighbors) --
+ego_1 <- make_ego_graph(g, order = 1, nodes = target_index, mode = "all")[[1]]
+
+
+# 1. Compute PageRank for the ego network
+V(ego_1)$pagerank <- page_rank(ego_1)$vector
+
+# 2. Prepare node data frame with your consistent color scheme
+nodes_df_pagerank <- data.frame(
+  id = V(ego_1)$name,
+  label = V(ego_1)$label,
+  group = V(ego_1)$sub_type,
+  title = paste0("<b>", V(ego_1)$label, "</b><br>PageRank: ", round(V(ego_1)$pagerank, 4)),
+  shape = ifelse(V(ego_1)$sub_type == "Person", "dot",
+                 ifelse(V(ego_1)$sub_type == "Organization", "square",
+                        ifelse(V(ego_1)$sub_type == "Vessel", "triangle",
+                               ifelse(V(ego_1)$sub_type == "Group", "star", "diamond")))),
+  color = case_when(
+    V(ego_1)$sub_type == "Person" ~ "#2ca5ff",
+    V(ego_1)$sub_type == "Organization" ~ "#f5ee15",
+    V(ego_1)$sub_type == "Vessel" ~ "#FB7E81",
+    V(ego_1)$sub_type == "Group" ~ "#25e158",
+    V(ego_1)$sub_type == "Location" ~ "#ec4bff",
+    TRUE ~ "black"
+  ),
+  value = V(ego_1)$pagerank * 30 + 5
+)
+
+# 3. Prepare edges
+edges_df <- as_data_frame(ego_1, what = "edges") %>%
+  rename(from = from, to = to)
+
+# 4. Plot with visNetwork
+visNetwork(nodes_df_pagerank, edges_df, width = "100%", height = "400px") %>%
+  visNodes(
+    scaling = list(min = 5, max = 30),
+    color = list(background = nodes_df_pagerank$color, border = "black"),
+    shape = nodes_df_pagerank$shape
+  ) %>%
+  visEdges(arrows = list(to = list(enabled = TRUE, scaleFactor = 0.3)), color = list(color = "gray")) %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE, manipulation = FALSE) %>%
+  visInteraction(dragNodes = FALSE, dragView = FALSE, zoomView = FALSE) %>%
+  visLegend() %>%
+  visLayout(randomSeed = 1818)
+
+```
+
+#### **3.5.2 - Betweenness for Nadia Conti**
+
+```{r}
+#| code-fold: true
+
+# 1. Compute Betweenness for the ego network
+V(ego_1)$betweenness <- betweenness(ego_1, directed = TRUE)
+
+# 2. Prepare node data frame
+nodes_df_betweenness <- data.frame(
+  id = V(ego_1)$name,
+  label = V(ego_1)$label,
+  group = V(ego_1)$sub_type,
+  title = paste0("<b>", V(ego_1)$label, "</b><br>Betweenness: ", round(V(ego_1)$betweenness, 2)),
+  shape = ifelse(V(ego_1)$sub_type == "Person", "dot",
+                 ifelse(V(ego_1)$sub_type == "Organization", "square",
+                        ifelse(V(ego_1)$sub_type == "Vessel", "triangle",
+                               ifelse(V(ego_1)$sub_type == "Group", "star", "diamond")))),
+  color = case_when(
+    V(ego_1)$sub_type == "Person" ~ "#2ca5ff",
+    V(ego_1)$sub_type == "Organization" ~ "#f5ee15",
+    V(ego_1)$sub_type == "Vessel" ~ "#FB7E81",
+    V(ego_1)$sub_type == "Group" ~ "#25e158",
+    V(ego_1)$sub_type == "Location" ~ "#ec4bff",
+    TRUE ~ "black"
+  ),
+  value = V(ego_1)$betweenness * 2 + 5
+)
+
+# 3. Edges (same as before)
+# edges_df already prepared
+
+# 4. Plot
+visNetwork(nodes_df_betweenness, edges_df, width = "100%", height = "400px") %>%
+  visNodes(
+    scaling = list(min = 5, max = 30),
+    color = list(background = nodes_df_betweenness$color, border = "black"),
+    shape = nodes_df_betweenness$shape
+  ) %>%
+  visEdges(arrows = list(to = list(enabled = TRUE, scaleFactor = 0.3)), color = list(color = "gray")) %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE, manipulation = FALSE) %>%
+  visInteraction(dragNodes = FALSE, dragView = FALSE, zoomView = FALSE) %>%
+  visLegend() %>%
+  visLayout(randomSeed = 1818)
+
+```
+
+#### **3.5.3 - Degree for Nadia Conti**
+
+```{r}
+#| code-fold: true
+
+# 1. Compute Degree for the ego network
+V(ego_1)$degree <- degree(ego_1, mode = "all")
+
+# 2. Prepare node data frame
+nodes_df_degree <- data.frame(
+  id = V(ego_1)$name,
+  label = V(ego_1)$label,
+  group = V(ego_1)$sub_type,
+  title = paste0("<b>", V(ego_1)$label, "</b><br>Degree: ", round(V(ego_1)$degree, 2)),
+  shape = ifelse(V(ego_1)$sub_type == "Person", "dot",
+                 ifelse(V(ego_1)$sub_type == "Organization", "square",
+                        ifelse(V(ego_1)$sub_type == "Vessel", "triangle",
+                               ifelse(V(ego_1)$sub_type == "Group", "star", "diamond")))),
+  color = case_when(
+    V(ego_1)$sub_type == "Person" ~ "#2ca5ff",
+    V(ego_1)$sub_type == "Organization" ~ "#f5ee15",
+    V(ego_1)$sub_type == "Vessel" ~ "#FB7E81",
+    V(ego_1)$sub_type == "Group" ~ "#25e158",
+    V(ego_1)$sub_type == "Location" ~ "#ec4bff",
+    TRUE ~ "black"
+  ),
+  value = V(ego_1)$degree * 5 + 5
+)
+
+# 3. Edges (same as before)
+# edges_df already prepared
+
+# 4. Plot
+visNetwork(nodes_df_degree, edges_df, width = "100%", height = "400px") %>%
+  visNodes(
+    scaling = list(min = 5, max = 30),
+    color = list(background = nodes_df_degree$color, border = "black"),
+    shape = nodes_df_degree$shape
+  ) %>%
+  visEdges(arrows = list(to = list(enabled = TRUE, scaleFactor = 0.3)), color = list(color = "gray")) %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE, manipulation = FALSE) %>%
+  visInteraction(dragNodes = FALSE, dragView = FALSE, zoomView = FALSE) %>%
+  visLegend() %>%
+  visLayout(randomSeed = 1818)
+
+```
+
+::: callout-tip
+## 1c. With a focus on "Nadia Conti", the visuals above could determine who has influence over this person.
+
+1.  Degree centrality reveals that Nadia Conti is well-connected within her local network, with a degree of 17. However, she is not the most connected node; vessels such as Mako (37), Reef Guardian (27), and Remora (21), as well as organizations like Oceanus City Council (28) and V. Miesel Shipping (19), have even higher degrees. This indicates that while Nadia is an important hub, her sphere of direct interaction is embedded within a dense mesh of other highly connected entities.
+
+2.  Several other individuals (e.g., Davis with 16, Boss with 13, Mrs. Money with 12) and vessels (e.g., Neptune with 19, Sentinel with 16) also play significant roles in Nadia’s network. The presence of organizations (e.g., Green Guardians, Sailor Shifts Team), multiple vessels, and key persons shows that **Nadia’s environment is both diverse and robust**.
+
+3.  **Direct Connections**
+
+    These direct connections are clearly shown as nodes that have edges (arrows) going into or out of Nadia Conti’s node in the network diagrams. Nadia Conti directly connects to several core entities across different types:
+
+    -   **People:** Elise, Liam Thorne, Davis, Rodriguez
+    -   **Organization:** V. Miesel Shipping, Oceanus City Council, Sailor Shifts Team
+    -   **Vessel:** Neptune, Marlin, Remora, Sentinel
+    -   **Location:** Haacklee Harbor
+
+    **Interpretation:** The PageRank, Betweenness, and Degree centrality plots all consistently show **Nadia Conti as a major hub**, with a large node size reflecting her high centrality. Her immediate network includes influential vessels (Neptune, Remora), organizations (V. Miesel Shipping, Oceanus City Council), and several persons (Elise, Davis, Rodriguez).
+
+    Nadia’s position suggests she is a **key connector and influencer** but is herself surrounded by even larger hubs, particularly among vessels and organizations. Her ability to influence—and be influenced—is amplified by these connections, as these high-degree entities are likely sources and conduits of critical information and operational coordination. This structure points to a tightly interwoven community, where central actors such as Mako, Oceanus City Council, and V. Miesel Shipping may exert the most substantial influence over Nadia’s access to information, resources, and strategic decisions.
+:::
+
+# 9. Task 2: Interactions and Relationships Between People & Vessels
+
+**Question 2 Goals**:
+
+> Understand and explore interactions and relationships groups between people and vessels.\
+> Identify closely associated groups and their thematic focus.
+
+### Step-by-step Plan
+
+#### Step 1: Run Community Detection
+
+Ensure we have a usable network graph:
+
+```{r}
+# Step 1: Convert directed tidygraph to igraph, then undirected
+igraph_undirected <- as.undirected(as.igraph(mc3_graph), mode = "collapse")
+
+# Step 2: Convert back to tidygraph (tbl_graph)
+mc3_graph_undirected <- as_tbl_graph(igraph_undirected)
+
+# Step 3: Apply Louvain community detection
+mc3_graph_undirected <- mc3_graph_undirected %>%
+  mutate(community = as.factor(group_louvain()))
+
+```
+
+#### Step 2: Extract People & Vessels with Community Info
+
+```{r}
+# Extract node table from graph
+people_vessels_comm <- mc3_graph_undirected %>%
+  as_tibble() %>%
+  filter(sub_type %in% c("Person", "Vessel")) %>%
+  select(label, sub_type, community)
+
+# Quick look
+head(people_vessels_comm)
+
+```
+
+#### Step 3: Summary Table of People & Vessels by Community
+
+```{r}
+# Community composition
+library(knitr)
+
+group_summary <- people_vessels_comm %>%
+  count(community, sub_type, sort = TRUE)
+
+kable(group_summary, caption = "Distribution of People and Vessels Across Detected Communities")
+
+```
+
+#### Step 4: Visualize Clusters of People & Vessels
+
+```{r}
+ggraph(mc3_graph_undirected, layout = "fr") +
+  geom_edge_link(alpha = 0.1, colour = "grey") +
+  geom_node_point(aes(color = community, shape = sub_type), size = 3, alpha = 0.9) +
+  geom_node_text(aes(label = ifelse(sub_type %in% c("Person", "Vessel"), label, NA_character_)), 
+                 size = 2.3, repel = TRUE) +
+  labs(
+    title = "Community Clusters of People and Vessels in Oceanus",
+    subtitle = "Identified using Louvain Algorithm on Undirected Graph"
+  ) +
+  theme_graph() +
+  theme(legend.position = "bottom")
+
+```
+
+#### **Step 5 – Thematic Tagging of Communities**
+
+We will assign **themes** to nodes and communities based on keywords in `label` or `sub_type`. For example:
+
+-   Entities with “Green” or “Guardian” → `Environmental`
+-   Labels with “Sailor Shift” or “Pop” → `Sailor Shift`
+-   Any node with `sub_type == "Vessel"` → `Vessel`
+-   All others → `Other`
+
+Code: Assign Themes to Nodes
+
+```{r}
+# Tag each node in the undirected graph with a thematic label
+mc3_graph_undirected <- mc3_graph_undirected %>%
+  mutate(theme = case_when(
+    str_detect(label, regex("Green|Guardian", ignore_case = TRUE)) ~ "Environmental",
+    str_detect(label, regex("Sailor Shift|Pop", ignore_case = TRUE)) ~ "Sailor Shift",
+    sub_type == "Vessel" ~ "Vessel",
+    TRUE ~ "Other"
+  ))
+
+```
+
+Code: Summarize Theme Composition
+
+```{r}
+# Theme breakdown per community
+theme_summary <- mc3_graph_undirected %>%
+  as_tibble() %>%
+  count(community, theme, sort = TRUE)
+
+knitr::kable(theme_summary, caption = "Theme Breakdown per Community")
+
+```
+
+#### **Step 6 – Faceted or Thematic Visualization**
+
+We will now plot **faceted or color-coded networks** to show how these communities and themes look visually.
+
+🔹 Option A: **Color by Theme**
+
+```{r}
+ggraph(mc3_graph_undirected, layout = "fr") +
+  geom_edge_link(alpha = 0.1, colour = "grey") +
+  geom_node_point(aes(color = theme, shape = sub_type), size = 3, alpha = 0.9) +
+  geom_node_text(aes(label = ifelse(sub_type %in% c("Person", "Vessel"), label, NA_character_)), 
+                 size = 2.3, repel = TRUE) +
+  labs(
+    title = "Network of People and Vessels in Oceanus",
+    subtitle = "Color-coded by Theme (Environmental, Sailor Shift, Vessel)"
+  ) +
+  theme_graph() +
+  theme(legend.position = "bottom")
+
+```
+
+🔹 Option B: **Facet by Theme**
+
+```{r}
+ggraph(mc3_graph_undirected, layout = "fr") +
+  geom_edge_link(alpha = 0.1, colour = "grey") +
+  geom_node_point(aes(color = community, shape = sub_type), size = 3, alpha = 0.9) +
+  geom_node_text(aes(label = ifelse(sub_type %in% c("Person", "Vessel"), label, NA_character_)), 
+                 size = 2.3, repel = TRUE) +
+  facet_nodes(~ theme) +
+  labs(
+    title = "Community Clusters Faceted by Theme",
+    subtitle = "Facets: Environmental, Sailor Shift, Vessel, Other"
+  ) +
+  theme_graph() +
+  theme(legend.position = "none")
+```
+
+## Strategy for Question 2:
+
+### 1. **Filter for Communication Events Only**
+
+-   Use `edges` that connect `Entity → Event (Communication)` and `Event (Communication) → Entity`.
+-   Focus only on `Communication` events and extract senders and receivers.
+
+```{r}
+#| message: false
+#| warning: false
+
+# Extract Communication Events from nodes
+communication_events <- mc3_nodes_cleaned %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  select(id, label)
+
+# Extract sent edges: Entity → Communication Event
+comm_sent_edges <- mc3_edges_cleaned %>%
+  filter(type == "sent", to_id %in% communication_events$id)
+
+# Extract received edges: Communication Event → Entity
+comm_received_edges <- mc3_edges_cleaned %>%
+  filter(type == "received", from_id %in% communication_events$id)
+
+# Join both to get Sender → Communication → Receiver
+comm_links <- comm_sent_edges %>%
+  select(comm_id = to_id, sender = from_id) %>%
+  inner_join(
+    comm_received_edges %>% select(comm_id = from_id, receiver = to_id),
+    by = "comm_id"
+  ) %>%
+  filter(sender != receiver)
+
+```
+
+### 2. **Construct a Bipartite Graph of Communications**
+
+-   From edges:
+
+    -   **Sender (Entity)** → **Communication Event**
+    -   **Communication Event** → **Receiver (Entity)**
+
+-   Join both directions to link:\
+    `Entity A → Communication Event → Entity B` → derive `Entity A → Entity B` communication links.
+
+```{r}
+#| message: false
+
+# Get people and vessel node IDs
+people_vessels <- mc3_nodes_cleaned %>%
+  filter(sub_type %in% c("Person", "Vessel")) %>%
+  select(id, label, group = sub_type)
+
+# Filter comm links to include only person ↔ vessel or person ↔ person, etc.
+comm_links_filtered <- comm_links %>%
+  filter(sender %in% people_vessels$id, receiver %in% people_vessels$id)
+
+```
+
+### 3. **Build Communication Network**
+
+-   Nodes: People and Vessels only (from `mc3_nodes_cleaned`).
+-   Edges: Summarized links between these nodes based on co-involvement in the same communication event.
+
+```{r}
+#| message: false
+
+# Edge weight (number of communications)
+edge_df <- comm_links_filtered %>%
+  count(sender, receiver, name = "weight")
+
+# Create node list for graph
+nodes_df <- people_vessels %>%
+  filter(id %in% c(edge_df$sender, edge_df$receiver))
+
+# Build graph object
+comm_graph <- tbl_graph(nodes = nodes_df, edges = edge_df, directed = FALSE)
+
+```
+
+### 4. **Apply Community Detection (e.g., Louvain or Walktrap)**
+
+-   Use `igraph` or `tidygraph` to detect communities.
+-   Annotate communities for possible labels (e.g., Green Guardians, Sailor Shift fans) using node metadata.
+
+```{r}
+#| label: detect-communities
+comm_graph <- comm_graph %>%
+  mutate(community = as.factor(group_louvain()))
+```
+
+### 5. **Visualize Network**
+
+```{r}
+#| fig.width: 10
+#| fig.height: 8
+
+shape_map <- c("Person" = "circle", "Vessel" = "triangle")
+
+color_map <- c(
+  "Person" = "#fc8d62",
+  "Organization" = "#6baed6",
+  "Vessel" = "#66c2a2",
+  "Location" = "#c6dbef",
+  "Nadia Conti" = "#ffd92f"
+)
+
+ggraph(comm_graph, layout = "fr") +
+  geom_edge_link(aes(width = weight), alpha = 0.2, color = "gray50") +
+  geom_node_point(aes(color = group, shape = group), size = 4) +
+  geom_node_text(aes(label = label), repel = TRUE, size = 2.5) +
+  scale_shape_manual(values = shape_map) +
+  scale_color_manual(values = color_map) +
+  theme_graph() +
+  labs(title = "Communication Clusters Between People and Vessels",
+       subtitle = "Communities detected using Louvain algorithm")
+
+```
+
+```{r}
+#| message: false
+
+# Get only Person and Vessel nodes
+people_vessels <- mc3_nodes_cleaned %>%
+  filter(sub_type %in% c("Person", "Vessel")) %>%
+  select(id, label, group = sub_type)
+
+# Filter communication links for person ↔ vessel/person only
+comm_links_filtered <- comm_links %>%
+  filter(sender %in% people_vessels$id, receiver %in% people_vessels$id)
+```
+
+```{r}
+#| message: false
+
+# Count number of communications between each sender–receiver pair
+comm_edge_df <- comm_links_filtered %>%
+  count(sender, receiver, name = "weight")
+
+# Build node dataframe from involved IDs only
+comm_node_df <- people_vessels %>%
+  filter(id %in% unique(c(comm_edge_df$sender, comm_edge_df$receiver))) %>%
+  mutate(
+    shape = case_when(
+      group == "Person" ~ "dot",
+      group == "Vessel" ~ "triangle"
+    ),
+    color = case_when(
+      group == "Person" ~ "#fc8d62",
+      group == "Vessel" ~ "#66c2a2",
+      label == "Nadia Conti" ~ "#ffd92f",
+      TRUE ~ "#c6dbef"
+    )
+  )
+
+# Format edges for visNetwork
+comm_vis_edges <- comm_edge_df %>%
+  rename(from = sender, to = receiver) %>%
+  mutate(width = weight)
+```
+
+```{r}
+#| message: false
+
+library(igraph)
+
+# Create igraph object
+graph_ig <- graph_from_data_frame(comm_vis_edges, directed = FALSE, vertices = comm_node_df)
+
+# Apply Louvain clustering
+louvain_groups <- cluster_louvain(graph_ig)
+comm_node_df$group_comm <- as.factor(membership(louvain_groups))
+
+```
+
+```{r}
+#| warning: false
+#| fig-width: 12
+#| fig-height: 10
+
+library(visNetwork)
+
+# Title heading
+cat("### Interactive Network of Communication Between People and Vessels")
+
+# Final interactive visNetwork with consistent styling
+visNetwork(
+  nodes = comm_node_df,
+  edges = comm_vis_edges
+) %>%
+  visEdges(arrows = "to") %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123) %>%
+  visPhysics(
+    solver = "forceAtlas2Based",
+    forceAtlas2Based = list(
+      gravitationalConstant = -80,
+      centralGravity = 0.01,
+      springLength = 50,
+      springConstant = 0.02
+    ),
+    stabilization = list(enabled = TRUE, iterations = 100)
+  ) %>%
+  visInteraction(navigationButtons = TRUE) %>%
+  visLegend(
+    useGroups = FALSE,
+    addNodes = list(
+      list(label = "Person", shape = "dot", color = "#fc8d62"),
+      list(label = "Vessel", shape = "triangle", color = "#66c2a2")
+    ),
+    width = 0.1,
+    position = "left",
+    stepY = 80,
+    ncol = 1
+  )
+```
+
+```{r}
+#| code-fold: true
+#| warning: false
+#| fig-width: 12
+#| fig-height: 10
+
+library(scales)  # for rescale()
+
+# Step 1: Summarize sender–receiver communication volume
+comm_edges_vis <- comm_links_filtered %>%
+  count(sender, receiver, sort = TRUE) %>%
+  rename(from = sender, to = receiver, value = n)
+
+# Step 2: Compute messages sent per person
+message_counts <- comm_edges_vis %>%
+  group_by(from) %>%
+  summarise(sent_count = sum(value), .groups = "drop")
+
+# Step 3: Prepare node attributes (label, shape, color, size)
+nodes_vis <- mc3_nodes_cleaned %>%
+  filter(id %in% unique(c(comm_edges_vis$from, comm_edges_vis$to))) %>%
+  select(id, label, sub_type) %>%
+  left_join(message_counts, by = c("id" = "from")) %>%
+  mutate(
+    size = if_else(
+      sub_type == "Person",
+      rescale(sent_count, to = c(10, 40), na.rm = TRUE),
+      15
+    ),
+    title = paste0(label, "<br>Sub-type: ", sub_type,
+                   ifelse(!is.na(sent_count), paste0("<br>Sent: ", sent_count, " messages"), "")),
+    color = case_when(
+      sub_type == "Person" ~ "#fc8d62",
+      sub_type == "Vessel" ~ "#66c2a2",
+      TRUE ~ "black"
+    ),
+    shape = case_when(
+      sub_type == "Person" ~ "dot",
+      sub_type == "Vessel" ~ "triangle",
+      TRUE ~ "dot"
+    )
+  )
+
+# Step 4: Format edges
+edges_vis <- comm_edges_vis %>%
+  mutate(
+    arrows = "to",
+    width = rescale(value, to = c(1, 6)),
+    title = paste("Messages:", value)
+  )
+
+# Step 5: Define proper legend nodes (explicit list)
+legend_nodes <- list(
+  list(label = "Person", shape = "dot", color = "#fc8d62"),
+  list(label = "Vessel", shape = "triangle", color = "#66c2a2")
+)
+
+
+# Step 6: Render visNetwork with layout_on_sphere and custom legend
+cat("### Styled Communication Network (Scaled by Sent Messages)")
+
+visNetwork(nodes_vis, edges_vis, width = "100%", height = "900px") %>%
+  visNodes(size = nodes_vis$size) %>%
+  visLegend(
+    useGroups = FALSE,
+    addNodes = legend_nodes,
+    width = 0.1,
+    position = "left",
+    stepY = 80,
+    ncol = 1
+  ) %>%
+  visEdges(smooth = FALSE) %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visIgraphLayout(layout = "layout_on_sphere") %>%
+  visPhysics(enabled = FALSE) %>%
+  visLayout(randomSeed = 1818)
+```
+
+```{r}
+#| code-fold: true
+#| warning: false
+#| fig-width: 12
+#| fig-height: 10
+
+library(scales)  # for rescale()
+
+# Step 1: Summarize sender–receiver communication volume
+comm_edges_vis <- comm_links_filtered %>%
+  count(sender, receiver, sort = TRUE) %>%
+  rename(from = sender, to = receiver, value = n)
+
+# Step 2: Compute messages sent per person
+message_counts <- comm_edges_vis %>%
+  group_by(from) %>%
+  summarise(sent_count = sum(value), .groups = "drop")
+
+# Step 3: Prepare node attributes (label, shape, color, size)
+nodes_vis <- mc3_nodes_cleaned %>%
+  filter(id %in% unique(c(comm_edges_vis$from, comm_edges_vis$to))) %>%
+  select(id, label, sub_type) %>%
+  left_join(message_counts, by = c("id" = "from")) %>%
+  mutate(
+    size = if_else(
+      sub_type == "Person",
+      rescale(sent_count, to = c(10, 40), na.rm = TRUE),
+      15
+    ),
+    title = paste0(label, "<br>Sub-type: ", sub_type,
+                   ifelse(!is.na(sent_count), paste0("<br>Sent: ", sent_count, " messages"), "")),
+    color = case_when(
+      sub_type == "Person" ~ "#fc8d62",
+      sub_type == "Vessel" ~ "#66c2a2",
+      TRUE ~ "black"
+    ),
+    shape = case_when(
+      sub_type == "Person" ~ "dot",
+      sub_type == "Vessel" ~ "triangle",
+      TRUE ~ "dot"
+    )
+  )
+
+# Step 4: Format edges
+edges_vis <- comm_edges_vis %>%
+  mutate(
+    arrows = "to",
+    width = rescale(value, to = c(1, 6)),
+    title = paste("Messages:", value)
+  )
+
+# Step 5: Define proper legend nodes (explicit list)
+legend_nodes <- list(
+  list(label = "Person", shape = "dot", color = "#fc8d62"),
+  list(label = "Vessel", shape = "triangle", color = "#66c2a2")
+)
+
+
+# Step 6: Render visNetwork with layout_on_sphere and custom legend
+cat("### Styled Communication Network (Scaled by Sent Messages)")
+
+visNetwork(nodes_vis, edges_vis, width = "100%", height = "900px") %>%
+  visNodes(size = nodes_vis$size) %>%
+  visLegend(
+    useGroups = FALSE,
+    addNodes = legend_nodes,
+    width = 0.1,
+    position = "left",
+    stepY = 80,
+    ncol = 1
+  ) %>%
+  visEdges(smooth = FALSE) %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visPhysics(
+    solver = "forceAtlas2Based",
+    forceAtlas2Based = list(
+      gravitationalConstant = -50,   # Increase pull toward center
+      centralGravity = 0.005,        # Lower keeps outer nodes further
+      springLength = 100,            # Length between nodes
+      springConstant = 0.02
+    ),
+    stabilization = list(enabled = TRUE, iterations = 100)
+  ) %>%
+  visLayout(randomSeed = 1818)
+
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+# Step 1: Filter only Communication edges
+comm_edges_all <- mc3_edges_cleaned %>%
+  filter(type %in% c("sent", "received"))
+
+# Step 2: Count messages by sender/receiver
+sent_counts <- comm_edges_all %>%
+  filter(type == "sent") %>%
+  count(from_id, name = "sent")
+
+received_counts <- comm_edges_all %>%
+  filter(type == "received") %>%
+  count(to_id, name = "received")
+
+# Step 3: Join and label
+comm_summary <- full_join(sent_counts, received_counts, by = c("from_id" = "to_id")) %>%
+  rename(id = from_id) %>%
+  replace_na(list(sent = 0, received = 0)) %>%
+  left_join(mc3_nodes_cleaned %>% select(id, label, sub_type), by = "id") %>%
+  pivot_longer(cols = c(sent, received), names_to = "direction", values_to = "count")
+
+# Step 4: Bar plot
+ggplot(comm_summary, aes(x = reorder(label, -count), y = count, fill = direction)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("sent" = "#2ca5ff", "received" = "#fb8072")) +
+  labs(
+    title = "Message Volume by Entity",
+    x = "Entity",
+    y = "Message Count",
+    fill = "Direction"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(ggtext)
+
+# Step 1: Filter only Communication edges
+comm_edges_all <- mc3_edges_cleaned %>%
+  filter(type %in% c("sent", "received"))
+
+# Step 2: Count messages sent and received
+sent_counts <- comm_edges_all %>%
+  filter(type == "sent") %>%
+  count(from_id, name = "sent")
+
+received_counts <- comm_edges_all %>%
+  filter(type == "received") %>%
+  count(to_id, name = "received")
+
+# Step 3: Join and format
+comm_summary <- full_join(sent_counts, received_counts, by = c("from_id" = "to_id")) %>%
+  rename(id = from_id) %>%
+  replace_na(list(sent = 0, received = 0)) %>%
+  left_join(mc3_nodes_cleaned %>% select(id, label, sub_type), by = "id") %>%
+  pivot_longer(cols = c(sent, received), names_to = "direction", values_to = "count")
+
+# Step 4: Create colored labels for x-axis
+comm_summary <- comm_summary %>%
+  mutate(
+    x_label = paste0(
+      "<span style='color:",
+      case_when(
+        sub_type == "Vessel" ~ "#66c2a2",
+        sub_type == "Person" ~ "#fc8d62",
+        TRUE ~ "gray"
+      ),
+      "'>", label, "</span>"
+    )
+  )
+
+# Step 5: Bar Plot with colored axis text
+ggplot(comm_summary, aes(x = reorder(x_label, -count), y = count, fill = direction)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("sent" = "#2ca5ff", "received" = "#fb8072")) +
+  labs(
+    title = "Message Volume by Entity",
+    x = "Entity",
+    y = "Message Count",
+    fill = "Direction"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x = element_markdown(angle = 45, hjust = 1),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(plotly)
+library(DT)
+
+# Step 1: Compute message counts
+comm_edges_all <- mc3_edges_cleaned %>%
+  filter(type %in% c("sent", "received"))
+
+sent_counts <- comm_edges_all %>%
+  filter(type == "sent") %>%
+  count(from_id, name = "sent")
+
+received_counts <- comm_edges_all %>%
+  filter(type == "received") %>%
+  count(to_id, name = "received")
+
+# Step 2: Combine counts
+comm_summary <- full_join(sent_counts, received_counts, by = c("from_id" = "to_id")) %>%
+  rename(id = from_id) %>%
+  replace_na(list(sent = 0, received = 0)) %>%
+  left_join(mc3_nodes_cleaned %>% select(id, label, sub_type), by = "id")
+
+# Step 3: Reshape for plotly
+comm_long <- comm_summary %>%
+  pivot_longer(cols = c(sent, received), names_to = "direction", values_to = "count")
+
+# Step 4: Plotly bar chart (interactive)
+plot_ly(
+  comm_long,
+  x = ~label,
+  y = ~count,
+  color = ~direction,
+  colors = c("sent" = "#2ca5ff", "received" = "#fb8072"),
+  type = 'bar',
+  text = ~paste0("Entity: ", label, "<br>Type: ", sub_type, "<br>Count: ", count),
+  hoverinfo = 'text',
+  name = ~direction
+) %>%
+  layout(
+    title = "Interactive Message Volume by Entity",
+    barmode = 'group',
+    xaxis = list(title = "Entity", tickangle = -45),
+    yaxis = list(title = "Message Count")
+  )
+
+```
+
+```{r}
+#| code-fold: true
+datatable(
+  comm_summary %>% arrange(desc(sent + received)),
+  options = list(
+    pageLength = 10,
+    autoWidth = TRUE,
+    searchHighlight = TRUE
+  ),
+  colnames = c("ID", "Name", "Sent", "Received", "Type")
+)
+
+```
+
+## **Strategy to Tackle Q2b**
+
+### Step 1: **Community Detection with Louvain**
+
+-   Use `igraph::cluster_louvain()` on the communication network built in 2a (undirected).
+-   Assign a `community` ID to each node (`nodes_vis$community`).
+
+### Step 2: **Inspect and Interpret Communities**
+
+-   Summarize the composition of each community by:
+
+    -   Number of persons/vessels
+    -   Top labels in each group
+    -   Known keywords (e.g., “Green Guardians”, “Sailor Shift”, vessel names like “Aurora” or “Bluefin”)
+
+### Step 3: **Color-code the Network by Community**
+
+-   Assign a distinct color to each detected community.
+-   Retain shape encoding (dot = Person, triangle = Vessel).
+
+### Step 4: **Interactive Visualization**
+
+-   Use `visNetwork` to display the full communication network:
+
+    -   Color nodes by `community`
+
+    -   Tooltip includes label, type, community
+
+    -   Legend for each detected community
+
+```{r}
+library(igraph)
+library(visNetwork)
+library(RColorBrewer)
+library(dplyr)
+library(tibble)
+
+# Create igraph from person-vessel edges
+g_comm <- graph_from_data_frame(edges_vis, directed = FALSE, vertices = nodes_vis)
+
+# Louvain detection
+louvain_clusters <- cluster_louvain(g_comm)
+nodes_vis$louvain_comm <- as.factor(membership(louvain_clusters))
+
+# Walktrap detection
+walktrap_clusters <- cluster_walktrap(g_comm)
+nodes_vis$walktrap_comm <- as.factor(membership(walktrap_clusters))
+
+# Create color palettes
+max_comm <- max(as.numeric(nodes_vis$louvain_comm), as.numeric(nodes_vis$walktrap_comm))
+comm_colors <- brewer.pal(n = min(max_comm, 8), name = "Set2")
+
+# Assign community color for each method
+nodes_louvain <- nodes_vis %>%
+  mutate(
+    color = comm_colors[as.numeric(louvain_comm)],
+    title = paste0(label, "<br>Type: ", sub_type, "<br>Louvain: ", louvain_comm)
+  )
+
+nodes_walktrap <- nodes_vis %>%
+  mutate(
+    color = comm_colors[as.numeric(walktrap_comm)],
+    title = paste0(label, "<br>Type: ", sub_type, "<br>Walktrap: ", walktrap_comm)
+  )
+
+```
+
+```{r}
+# Define consistent edge formatting
+edges_format <- edges_vis %>%
+  mutate(arrows = "to", width = width)
+
+# Louvain network
+louvain_net <- visNetwork(nodes_louvain, edges_format, height = "700px") %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visPhysics(stabilization = TRUE) %>%
+  visLayout(randomSeed = 42) %>%
+  visNodes(shape = nodes_louvain$shape, size = nodes_louvain$size) %>%
+  visEdges(smooth = FALSE) %>%
+  visLegend(main = list(text = "Louvain Communities"), useGroups = FALSE)
+
+# Walktrap network
+walktrap_net <- visNetwork(nodes_walktrap, edges_format, height = "700px") %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visPhysics(stabilization = TRUE) %>%
+  visLayout(randomSeed = 42) %>%
+  visNodes(shape = nodes_walktrap$shape, size = nodes_walktrap$size) %>%
+  visEdges(smooth = FALSE) %>%
+  visLegend(main = list(text = "Walktrap Communities"), useGroups = FALSE)
+
+```
+
+📌 **Louvain Community Network**
+
+```{r}
+#| code-fold: true
+
+# Generate cluster legend for Louvain
+louvain_legend <- unique(nodes_louvain$louvain_comm) %>%
+  sort() %>%
+  purrr::map(function(comm_id) {
+    list(
+      label = paste("Cluster", comm_id),
+      shape = "dot",
+      color = unique(nodes_louvain$color[nodes_louvain$louvain_comm == comm_id])[1]
+    )
+  })
+
+# Render Louvain network
+cat("## Louvain Community Detection Network")
+
+visNetwork(nodes_louvain, edges_format, width = "100%", height = "750px") %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visPhysics(
+    solver = "forceAtlas2Based",
+    forceAtlas2Based = list(
+      gravitationalConstant = -30,
+      centralGravity = 0.001,
+      springLength = 150,
+      springConstant = 0.03
+    ),
+    stabilization = list(enabled = TRUE, iterations = 200)
+  ) %>%
+  visLayout(randomSeed = 42, improvedLayout = TRUE) %>%
+  visNodes(shape = nodes_louvain$shape, size = nodes_louvain$size) %>%
+  visEdges(smooth = FALSE) %>%
+  visLegend(
+    useGroups = FALSE,
+    addNodes = louvain_legend,
+    position = "left",
+    width = 0.075,
+    stepY = 70,
+    ncol = 1
+  ) %>%
+  visInteraction(
+    dragNodes = TRUE,
+    navigationButtons = TRUE
+  )
+
+```
+
+📌 **Walktrap Community Network**
+
+```{r}
+#| code-fold: true
+
+# Generate cluster legend for Walktrap
+walktrap_legend <- unique(nodes_walktrap$walktrap_comm) %>%
+  sort() %>%
+  purrr::map(function(comm_id) {
+    list(
+      label = paste("Cluster", comm_id),
+      shape = "dot",
+      color = unique(nodes_walktrap$color[nodes_walktrap$walktrap_comm == comm_id])[1]
+    )
+  })
+
+# Render Walktrap network
+cat("## Walktrap Community Detection Network")
+
+visNetwork(nodes_walktrap, edges_format, width = "100%", height = "750px") %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visPhysics(
+    solver = "forceAtlas2Based",
+    forceAtlas2Based = list(
+      gravitationalConstant = -30,
+      centralGravity = 0.001,
+      springLength = 150,
+      springConstant = 0.03
+    ),
+    stabilization = list(enabled = TRUE, iterations = 200)
+  ) %>%
+  visLayout(randomSeed = 42, improvedLayout = TRUE) %>%
+  visNodes(shape = nodes_walktrap$shape, size = nodes_walktrap$size) %>%
+  visEdges(smooth = FALSE) %>%
+  visLegend(
+    useGroups = FALSE,
+    addNodes = walktrap_legend,
+    position = "left",
+    width = 0.075,
+    stepY = 70,
+    ncol = 1
+  ) %>%
+  visInteraction(
+    dragNodes = TRUE,
+    navigationButtons = TRUE
+  )
+
+```
+
+# 10. - Task 3: Determine who uses pseudonyms and what they are using
+
+## VAST Challenge Task & Question 3a
+
+1.  Expanding upon your prior visual analytics, determine who is using pseudonyms to communicate, and what these pseudonyms are.
+
+    -   Some that Clepper has already identified include: “Boss”, and “The Lookout”, but there appear to be many more.
+
+    -   To complicate the matter, pseudonyms may be used by multiple people or vessels.
+
+### 1. Cleaning the dataset
+
+The code below is to help us to further clean the data first before we can start to answer question 3
+
+```{r}
+# Step 1: Define pseudonyms
+pseudonym_keywords <- c("Boss", "The Lookout", "The Intern", "Mrs. Money", 
+                        "The Accountant", "The Middleman", "Small Fry")
+
+# Step 2: Filter pseudonym nodes (from mc3_nodes_final)
+pseudonym_nodes <- mc3_nodes_final %>%
+  filter(
+    sub_type == "Person",
+    str_detect(name, regex(paste(pseudonym_keywords, collapse = "|"), ignore_case = TRUE))
+  )
+
+# Step 3: Get all edge rows where from/to match pseudonym node indices
+pseudonym_node_indices <- pseudonym_nodes$new_index
+
+pseudonym_edges_final <- mc3_edges_final %>%
+  filter(from %in% pseudonym_node_indices | to %in% pseudonym_node_indices)
+
+# Step 4: Get only nodes that are involved in these edges
+used_node_indices <- unique(c(pseudonym_edges_final$from, pseudonym_edges_final$to))
+
+pseudonym_nodes_final <- mc3_nodes_final %>%
+  filter(new_index %in% used_node_indices) %>%
+  mutate(label_type = ifelse(new_index %in% pseudonym_node_indices, "Pseudonym", "Regular"))
+
+# Step 5: Reindex nodes to match edge structure (0-based problem fix)
+pseudonym_nodes_final <- pseudonym_nodes_final %>%
+  mutate(temp_index = row_number())
+
+# Mapping old new_index to new temp_index (for tbl_graph alignment)
+index_map <- pseudonym_nodes_final %>%
+  select(old = new_index, new = temp_index)
+
+# Update edges to new 1-based index
+pseudonym_edges_final <- pseudonym_edges_final %>%
+  left_join(index_map, by = c("from" = "old")) %>%
+  rename(from_new = new) %>%
+  left_join(index_map, by = c("to" = "old")) %>%
+  rename(to_new = new) %>%
+  filter(!is.na(from_new), !is.na(to_new)) %>%
+  select(from = from_new, to = to_new, type)
+
+# Step 6: Build graph
+pseudonym_graph <- tbl_graph(
+  nodes = pseudonym_nodes_final,
+  edges = pseudonym_edges_final,
+  directed = TRUE
+)
+```
+
+Before we start to answer the questions, let us first test out if the data cleaning is effective, which should be if not you wil not be able to see this!
+
+::: panel-tabset
+**Test code**
+
+```{r, eval=FALSE, fig.width=20, fig.height=15}
+ggraph(pseudonym_graph, layout = "fr") +
+  geom_edge_link(alpha = 0.3) +
+  geom_node_point(aes(color = label_type), size = 4) +
+  geom_node_text(aes(label = name), repel = TRUE, size = 3) +
+  labs(
+    title = "Pseudonym Communication Network",
+    subtitle = "Highlighting entities and their use of pseudonyms",
+    color = "Entity Type"
+  ) +
+  theme_void()
+```
+
+# Test
+
+```{r, echo=FALSE, fig.width=20, fig.height=15}
+ggraph(pseudonym_graph, layout = "fr") +
+  geom_edge_link(alpha = 0.3) +
+  geom_node_point(aes(color = label_type), size = 4) +
+  geom_node_text(aes(label = name), repel = TRUE, size = 3) +
+  labs(
+    title = "Pseudonym Communication Network",
+    subtitle = "Highlighting entities and their use of pseudonyms",
+    color = "Entity Type"
+  ) +
+  theme_void()
+```
+:::
+
+The visualisations below shows the entities labelled based on their real names or pseudinyms which are labelled differently using color codes so as for easier visualisation.
+
+::: panel-tabset
+# Method 1
+
+```{r}
+
+# Count how many connections each pseudonym has
+pseudonym_links <- pseudonym_edges_final %>%
+  left_join(pseudonym_nodes_final, by = c("from" = "temp_index")) %>%
+  rename(pseudonym = name) %>%
+  filter(!is.na(pseudonym)) %>%   # ✅ Only valid pseudonym nodes
+  group_by(pseudonym) %>%
+  summarise(connection_count = n()) %>%
+  arrange(desc(connection_count))
+
+
+# Plot it
+ggplot(pseudonym_links, aes(x = reorder(pseudonym, connection_count), y = connection_count)) +
+  geom_col(fill = "tomato") +
+  coord_flip() +
+  labs(
+    title = "Communication Frequency by Pseudonym",
+    x = "Pseudonym Name",
+    y = "Number of Connections"
+  )
+
+```
+
+# Method 2
+
+```{r}
+
+# Prepare node dataframe
+nodes_vis <- pseudonym_nodes_final %>%
+  transmute(
+    id = temp_index,
+    label = name,
+    group = ifelse(label_type == "Pseudonym", "Pseudonym", "Regular"),
+    title = paste("Name:", name, "<br>Type:", label_type)
+  )
+
+# Prepare edge dataframe
+edges_vis <- pseudonym_edges_final %>%
+  transmute(
+    from = from,
+    to = to,
+    label = type,
+    arrows = "to"
+  )
+
+# Create visNetwork
+visNetwork(nodes_vis, edges_vis, height = "600px", width = "100%") %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visGroups(groupname = "Pseudonym", color = "tomato") %>%
+  visGroups(groupname = "Regular", color = "steelblue") %>%
+  visLegend(addNodes = list(
+    list(label = "Pseudonym", shape = "dot", color = "tomato"),
+    list(label = "Regular", shape = "dot", color = "steelblue")
+  )) %>%
+  visLayout(randomSeed = 42) %>%
+  visPhysics(stabilization = TRUE)
+
+```
+:::
+
+As we can see, there are 2 methods that we can use to visualise this case. The aim of this visualisation is to help clepper to visually identufy which nodes are pseudonuyms, and how are they connected to the real identity. Suspicious names or aliases will appear isolated
+
+-   From this visualisation, we can easily determine which names are Pseudonyms. These names can be easily identified via the color codes
+
+-   We can easily trace who talks to and/or through aliases
+
+-   This visualisation makes it easier for Clepper to spot suspicious names
+
+### 2. Question 3b
+
+1.  Describe how your visualizations make it easier for Clepper to identify common entities in the knowledge graph.
+
+::: panel-tabset
+# Code
+
+```{r, fig.width=20, fig.height=15}
+
+# Q3b: Extract edges involving those pseudonyms
+# Build pseudonym network using tidygraph
+pseudonym_graph_tbl <- tbl_graph(
+  nodes = pseudonym_nodes_final,
+  edges = pseudonym_edges_final,
+  directed = TRUE
+) %>%
+  mutate(degree_centrality = centrality_degree(mode = "all"))  # centrality values added to nodes
+
+# Turn into tibble for ggplot
+top_central <- pseudonym_graph_tbl %>%
+  as_tibble() %>%
+  filter(label_type == "Pseudonym") %>%
+  arrange(desc(degree_centrality)) %>%
+  slice_head(n = 10)
+
+# Plot
+ggplot(top_central, aes(x = reorder(name, degree_centrality), y = degree_centrality)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Top 10 Central Pseudonym Entities",
+    x = "Pseudonym Name",
+    y = "Degree Centrality"
+  )
+
+
+```
+
+# Visualisation output
+
+```{r, fig.width=20, fig.height=15}
+
+# Q3b: Extract edges involving those pseudonyms
+# Build pseudonym network using tidygraph
+pseudonym_graph_tbl <- tbl_graph(
+  nodes = pseudonym_nodes_final,
+  edges = pseudonym_edges_final,
+  directed = TRUE
+) %>%
+  mutate(degree_centrality = centrality_degree(mode = "all"))  # centrality values added to nodes
+
+# Turn into tibble for ggplot
+top_central <- pseudonym_graph_tbl %>%
+  as_tibble() %>%
+  filter(label_type == "Pseudonym") %>%
+  arrange(desc(degree_centrality)) %>%
+  slice_head(n = 10)
+
+# Plot
+ggplot(top_central, aes(x = reorder(name, degree_centrality), y = degree_centrality)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Top 10 Central Pseudonym Entities",
+    x = "Pseudonym Name",
+    y = "Degree Centrality"
+  )
+
+
+```
+:::
+
+The visualisation shows a bar chart of degree centrality that shows the tiop 10 most connectd pseudonyms. The aim of this graph is to heko clepper to quantify influence by measuring the cetrakity of the pseudonyms for deeper investigation. It also helps Clepper t identify who are the key players who may be controlling the flow of information
+
+-   These visualisation helps Clepper to identify wich of the pseudonyms are most active
+
+-   We can see that the nodes act as central hubs wihin the pseudonym network
+
+-   This visualisation can help clepper to prioritize pseudionyms first as part of his investigations
+
+### 3. Question 3c
+
+**Code**
+
+```{r}
+
+shared_pseudonyms <- pseudonym_nodes_final %>%
+  group_by(name) %>%
+  filter(n() > 1) %>%
+  ungroup()
+
+# Create nodes: both entities and pseudonyms
+vis_nodes_3c <- shared_pseudonyms %>%
+  transmute(id = id, 
+            label = id, 
+            group = "Entity",
+            title = paste("Entity ID:", id)) %>%
+  bind_rows(
+    shared_pseudonyms %>%
+      select(id = name) %>%
+      distinct() %>%
+      mutate(label = id,
+             group = "Pseudonym",
+             title = paste("Pseudonym:", id))
+  )
+
+vis_edges_3c <- shared_pseudonyms %>%
+  transmute(from = id, to = name)
+
+visNetwork(vis_nodes_3c, vis_edges_3c, height = "600px", width = "100%") %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visGroups(groupname = "Entity", color = "steelblue") %>%
+  visGroups(groupname = "Pseudonym", color = "tomato") %>%
+  visLegend(addNodes = list(
+    list(label = "Entity", shape = "dot", color = "steelblue"),
+    list(label = "Pseudonym", shape = "dot", color = "tomato")
+  )) %>%
+  visLayout(randomSeed = 123)
+```
+
+**Visualisation Output**
+
+```{r}
+
+shared_pseudonyms <- pseudonym_nodes_final %>%
+  group_by(name) %>%
+  filter(n() > 1) %>%
+  ungroup()
+
+# Create nodes: both entities and pseudonyms
+vis_nodes_3c <- shared_pseudonyms %>%
+  transmute(id = id, 
+            label = id, 
+            group = "Entity",
+            title = paste("Entity ID:", id)) %>%
+  bind_rows(
+    shared_pseudonyms %>%
+      select(id = name) %>%
+      distinct() %>%
+      mutate(label = id,
+             group = "Pseudonym",
+             title = paste("Pseudonym:", id))
+  )
+
+vis_edges_3c <- shared_pseudonyms %>%
+  transmute(from = id, to = name)
+
+visNetwork(vis_nodes_3c, vis_edges_3c, height = "600px", width = "100%") %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visGroups(groupname = "Entity", color = "steelblue") %>%
+  visGroups(groupname = "Pseudonym", color = "tomato") %>%
+  visLegend(addNodes = list(
+    list(label = "Entity", shape = "dot", color = "steelblue"),
+    list(label = "Pseudonym", shape = "dot", color = "tomato")
+  )) %>%
+  visLayout(randomSeed = 123)
+```
+
+The visualisation used for this part of the question is an interactive graph using the `visNetwork` entity which shows the edges and nodes. The blue nodes indicates the entities (may be people or vessels), red nodes which is the pseudonym names and edges which indicates which entity uses what pseudonym. The aim of this visualisation is to expose the reusing of an alias whereby the same pseudonym is tied and connected to multiple entities
+
+-   This visualisation helps Clepper to easily identify which pseudonyms are reused by multiple entities
+
+-   This breaks the assumed connection between identity and name revealing many one-to-one mapping
+
+-   This therefore can help Clepper to detect deception strategies such as multiple people pretending to have one single alias, hence minimising the risks of impersonation.
+
+# 11. - Task 4: Investigation of Nadia Conti
+
+## VAST Challenge Task & Question 4a
+
+1.  Clepper suspects that Nadia Conti, who was formerly entangled in an illegal fishing scheme, may have continued illicit activity within Oceanus.
+
+    1.  Through visual analytics, provide evidence that Nadia is, or is not, doing something illegal.
+
+### 1. Extracting Nadia's data
+
+```{r}
+nodes <- MC3$nodes
+edges <- MC3$edges
+
+# Extract communication events
+comms <- nodes %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  select(id, content)
+
+# Link to sender & receiver
+sent_edges <- edges %>% filter(type == "sent") %>%
+  select(source = source, comm_id = target)
+
+recv_edges <- edges %>% filter(type == "received") %>%
+  select(comm_id = source, target = target)
+
+# Merge
+comms_data <- comms %>%
+  left_join(sent_edges, by = c("id" = "comm_id")) %>%
+  rename(sender = source) %>%
+
+  left_join(recv_edges, by = c("id" = "comm_id")) %>%
+  rename(receiver = target)
+
+# Add sender/receiver names
+mc3_nodes_cleaned <- nodes %>%
+  mutate(id = as.character(id)) %>%
+  filter(!is.na(id)) %>%
+  distinct(id, .keep_all = TRUE)
+
+comms_data <- comms_data %>%
+  left_join(mc3_nodes_cleaned %>% select(id, sender_label = label), by = c("sender" = "id")) %>%
+  left_join(mc3_nodes_cleaned %>% select(id, receiver_label = label), by = c("receiver" = "id"))
+
+# Count Nadia's messages
+nadia_counts <- comms_data %>%
+  summarise(
+    Sent = sum(sender_label == "Nadia Conti", na.rm = TRUE),
+    Received = sum(receiver_label == "Nadia Conti", na.rm = TRUE)
+  ) %>%
+  pivot_longer(cols = everything(), names_to = "Type", values_to = "Count") %>%
+  mutate(
+    Percent = Count / sum(Count),
+    Label = paste0(round(Percent * 100), "%\n(", Count, " msgs)")
+  )
+```
+
+### 2. Message count of Nadia
+
+```{r}
+ggplot(nadia_counts, aes(x = Count, y = reorder(Type, Count), fill = Type)) +
+  geom_col(color = "white") +
+  geom_text(aes(label = paste0(Count, " msgs (", round(Percent * 100), "%)")),
+            hjust = -0.1, size = 4) +
+  scale_fill_manual(values = c("Sent" = "deepskyblue3", "Received" = "cyan")) +
+  labs(title = paste0("Nadia Conti's Messages (Total: ", sum(nadia_counts$Count), ")"),
+       x = "Message Count", y = NULL) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.title = element_text(face = "bold")) +
+  xlim(0, max(nadia_counts$Count) * 1.2)
+```
+
+### 3. Message frequency of Nadia
+
+```{r}
+# Make sure nadia_data is created
+nadia_data <- comms_data %>%
+  filter(sender_label == "Nadia Conti" | receiver_label == "Nadia Conti") %>%
+  left_join(nodes %>% select(id, timestamp), by = c("id" = "id")) %>%
+  mutate(timestamp = ymd_hms(timestamp)) %>%
+  filter(!is.na(timestamp)) %>%
+  mutate(date = as.Date(timestamp), hour = hour(timestamp))
+
+# Create daily_freq
+daily_freq <- nadia_data %>%
+  group_by(date) %>%
+  summarise(count = n(), .groups = "drop")
+
+# Create hourly_freq
+hourly_freq <- nadia_data %>%
+  group_by(date, hour) %>%
+  summarise(count = n(), .groups = "drop")
+```
+
+#### 3.1 Daily
+
+```{r}
+ggplot(daily_freq, aes(x = date, y = count)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = count), vjust = -0.5, size = 3) +
+  labs(
+    title = "Nadia Conti's Daily Message Frequency",
+    x = "Date",
+    y = "Message Count"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+#### 3.2 Hourly
+
+```{r}
+library(plotly)
+
+plot_ly(
+  data = hourly_freq,
+  x = ~hour,
+  y = ~count,
+  color = ~as.factor(date),
+  type = 'bar',
+  text = ~paste("Date:", date, "<br>Hour:", hour, "<br>Messages:", count),
+  hoverinfo = 'text'
+) %>%
+  layout(
+    barmode = 'dodge',  # use 'stack' if you prefer stacked bars
+    title = "Nadia Conti's Hourly Message Frequency",
+    xaxis = list(title = "Hour of Day"),
+    yaxis = list(title = "Message Count"),
+    legend = list(title = list(text = "Date"))
+  )
+```
+
+### 4. Nadia's relationship pattern
+
+```{r}
+library(ggplot2)
+
+# Count relationships by type
+relationship_counts <- mc3_edges_cleaned %>%
+  filter(type != "sent", type != "received") %>%  # Focus on relationships, not communication
+  count(type, sort = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(visNetwork)
+
+# Summarise Nadia's communication edges
+nadia_edges <- nadia_data %>%
+  count(sender_label, receiver_label) %>%
+  filter(!is.na(sender_label), !is.na(receiver_label)) %>%
+  rename(from = sender_label, to = receiver_label, value = n)
+
+# Get sender + receiver entity info
+# Get type info for sender and receiver
+entity_info <- bind_rows(
+  nadia_data %>%
+    left_join(mc3_nodes_cleaned %>% select(id, name = label, type = sub_type),
+              by = c("sender" = "id")) %>%
+    select(name, type),
+  nadia_data %>%
+    left_join(mc3_nodes_cleaned %>% select(id, name = label, type = sub_type),
+              by = c("receiver" = "id")) %>%
+    select(name, type)
+) %>%
+  distinct()
+
+# Build node table
+nadia_nodes <- tibble(name = unique(c(nadia_edges$from, nadia_edges$to))) %>%
+  left_join(entity_info, by = "name") %>%
+  mutate(
+    group = ifelse(name == "Nadia Conti", "Nadia Conti", type),
+    id = name,
+    label = name,
+    color = case_when(
+      group == "Person" ~ "#fc8d62",       
+      group == "Organization" ~ "#6baed6",
+      group == "Vessel" ~ "#66c2a2",      
+      group == "Location" ~ "#c6dbef",    
+      group == "Nadia Conti" ~ "#ffd92f", 
+      TRUE ~ "#d9d9d9"
+    ),
+    shape = case_when(
+      group == "Person" ~ "dot",
+      group == "Organization" ~ "square",
+      group == "Vessel" ~ "triangle",
+      group == "Location" ~ "diamond",
+      group == "Nadia Conti" ~ "star",
+      TRUE ~ "dot"
+    )
+  )
+
+# Render network
+visNetwork(nodes = nadia_nodes, edges = nadia_edges) %>%
+  visEdges(arrows = "to") %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123) %>%
+  visPhysics(
+    solver = "forceAtlas2Based",
+    forceAtlas2Based = list(gravitationalConstant = -25, centralGravity = 0.01, springLength = 50, springConstant = 0.02),
+    stabilization = list(enabled = TRUE, iterations = 100)
+  ) %>%
+  visInteraction(navigationButtons = TRUE) %>%
+  visLegend(
+    useGroups = FALSE,
+    addNodes = list(
+      list(label = "Person", shape = "dot", color = "#fc8d62"),
+      list(label = "Organization", shape = "square", color = "#6baed6"),
+      list(label = "Vessel", shape = "triangle", color = "#66c2a2"),
+      list(label = "Location", shape = "diamond", color = "#c6dbef"),
+      list(label = "Nadia Conti", shape = "star", color = "#ffd92f")
+    ),
+    width = 0.2,
+    position = "left",
+    stepY = 80,
+    ncol = 1
+  )
+```
+
+### 5. Nadia's most frequent commuter
+
+```{r}
+# Get communication events linked to Nadia
+nadia_comm_ids <- edges %>%
+  filter(type == "sent" | type == "received") %>%
+  filter(source == mc3_nodes_cleaned$id[mc3_nodes_cleaned$label == "Nadia Conti"] |
+         target == mc3_nodes_cleaned$id[mc3_nodes_cleaned$label == "Nadia Conti"]) %>%
+  mutate(comm_id = ifelse(type == "sent", target, source)) %>%
+  pull(comm_id) %>%
+  unique()
+
+# Get edges related to these communications
+nadia_related_edges <- edges %>%
+  filter(source %in% nadia_comm_ids | target %in% nadia_comm_ids)
+
+# Get people connected (excluding comm events + Nadia herself)
+nadia_id <- mc3_nodes_cleaned$id[mc3_nodes_cleaned$label == "Nadia Conti"]
+
+nadia_contacts_ids <- nadia_related_edges %>%
+  mutate(person_id = ifelse(source %in% nadia_comm_ids, target, source)) %>%
+  filter(!person_id %in% nadia_comm_ids, person_id != nadia_id) %>%
+  count(person_id, sort = TRUE)
+
+# Join with node labels
+top_contacts_named <- nadia_contacts_ids %>%
+  left_join(nodes %>% filter(sub_type == "Person") %>% select(id, name = label),
+            by = c("person_id" = "id")) %>%
+  filter(!is.na(name))
+
+```
+
+```{r}
+top_contacts_named %>%
+  slice_max(n, n = 3) %>%
+  ggplot(aes(x = reorder(name, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Top 3 Contacts Communicating with Nadia Conti",
+    x = "Contact Person",
+    y = "Number of Messages"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+library(dplyr)
+library(DT)
+
+nadia_id <- mc3_nodes_cleaned$id[mc3_nodes_cleaned$label == "Nadia Conti"]
+
+# Nadia's communication event IDs
+nadia_comm_ids <- edges %>%
+  filter(type == "sent" | type == "received") %>%
+  filter(source == nadia_id | target == nadia_id) %>%
+  mutate(comm_id = ifelse(type == "sent", target, source)) %>%
+  pull(comm_id) %>%
+  unique()
+
+# Top contact comm IDs
+top_contact_comm_ids <- edges %>%
+  filter(
+    (source %in% nadia_comm_ids & target %in% top_contacts_named$person_id) |
+    (target %in% nadia_comm_ids & source %in% top_contacts_named$person_id)
+  ) %>%
+  mutate(comm_id = ifelse(source %in% nadia_comm_ids, source, target)) %>%
+  pull(comm_id) %>%
+  unique()
+
+# Get comm event details
+nadia_messages <- nodes %>%
+  filter(id %in% top_contact_comm_ids) %>%
+  filter(type == "Event", sub_type == "Communication") %>%
+  select(id, timestamp, content) %>%
+  left_join(edges %>% filter(type == "sent") %>% select(id = target, sender = source),
+            by = "id") %>%
+  left_join(edges %>% filter(type == "received") %>% select(id = source, receiver = target),
+            by = "id") %>%
+  left_join(mc3_nodes_cleaned %>% select(id, sender_name = label), by = c("sender" = "id")) %>%
+  left_join(mc3_nodes_cleaned %>% select(id, receiver_name = label), by = c("receiver" = "id")) %>%
+  mutate(
+    timestamp = ymd_hms(timestamp),
+    sender_receiver = paste(sender_name, "→", receiver_name)
+  ) %>%
+  arrange(timestamp) %>%
+  select(timestamp, sender_receiver, content)
+
+# Display
+DT::datatable(
+  nadia_messages,
+  options = list(
+    pageLength = 5,
+    autoWidth = TRUE,
+    scrollX = TRUE,
+    initComplete = htmlwidgets::JS(
+      "function(settings, json) {",
+      "$(this.api().table().header()).css({'background-color': '#f8f9fa', 'color': '#333'});",
+      "}"
+    )
+  ),
+  rownames = FALSE,
+  class = 'stripe hover compact',
+  caption = htmltools::tags$caption(
+    style = 'caption-side: top; text-align: left; font-size:16px; color:#444;',
+    'Messages'
+  )
+)
+```
+
+### 6. Temporal + suspicious event alignment
+
+#### 6.1 Showing Nadia's unusually active days
+
+```{r}
+# Compute mean + SD of daily messages
+daily_summary <- daily_freq %>%
+  summarise(mean_count = mean(count), sd_count = sd(count))
+
+# Flag days with unusually high message counts
+spike_days <- daily_freq %>%
+  filter(count > daily_summary$mean_count + 2 * daily_summary$sd_count)
+
+# Show spike days
+print(spike_days)
+```
+
+#### 6.2 Suspicious dates
+
+```{r}
+suspicious_dates <- as.Date(c("2040-10-05", "2040-10-08", "2040-10-11")) # example reef closure, approvals, etc.
+```
+
+```{r}
+spike_days %>%
+  mutate(suspicious = ifelse(date %in% suspicious_dates, "YES", "NO"))
+```
+
+```{r}
+library(plotly)
+library(dplyr)
+
+# Suppose suspicious dates (replace with real ones)
+suspicious_dates <- as.Date(c("2040-10-05", "2040-10-08", "2040-10-11"))
+
+# Compute threshold
+daily_summary <- daily_freq %>%
+  summarise(mean_count = mean(count), sd_count = sd(count))
+
+threshold <- daily_summary$mean_count + 2 * daily_summary$sd_count
+
+# Add status column
+daily_freq_plot <- daily_freq %>%
+  mutate(
+    status = case_when(
+      date %in% suspicious_dates ~ "Suspicious Date",
+      count > threshold ~ "Spike",
+      TRUE ~ "Normal"
+    )
+  )
+
+# Assign colors
+status_colors <- c(
+  "Normal" = "steelblue",
+  "Spike" = "red",
+  "Suspicious Date" = "orange"
+)
+
+# Build Plotly bar chart
+plot_ly(
+  data = daily_freq_plot,
+  x = ~date,
+  y = ~count,
+  type = 'bar',
+  color = ~status,
+  colors = status_colors,
+  text = ~paste("Date:", date, "<br>Messages:", count, "<br>Status:", status),
+  hoverinfo = 'text'
+) %>%
+  layout(
+    title = "Nadia Conti's Daily Communication",
+    xaxis = list(title = "Date"),
+    yaxis = list(title = "Message Count"),
+    barmode = 'group',
+    legend = list(title = list(text = "Status"))
+  ) %>%
+  add_lines(
+    x = ~date,
+    y = rep(threshold, nrow(daily_freq_plot)),
+    line = list(dash = 'dash', color = 'red'),
+    name = 'Spike Threshold',
+    inherit = FALSE
+  )
+```
+
+### 7. Drilling down on spike + flagged date
+
+#### 7.1 Extract Nadia's message from Oct 8
+
+```{r}
+# Build fresh nadia_data with content included at the start
+nadia_data <- comms %>%
+  left_join(sent_edges, by = c("id" = "comm_id")) %>%
+  rename(sender = source) %>%
+  left_join(recv_edges, by = c("id" = "comm_id")) %>%
+  rename(receiver = target) %>%
+  left_join(mc3_nodes_cleaned %>% select(id, sender_label = label), by = c("sender" = "id")) %>%
+  left_join(mc3_nodes_cleaned %>% select(id, receiver_label = label), by = c("receiver" = "id")) %>%
+  left_join(nodes %>% select(id, timestamp), by = "id") %>%
+  mutate(
+    timestamp = ymd_hms(timestamp),
+    date = as.Date(timestamp),
+    hour = hour(timestamp)
+  ) %>%
+  filter(sender_label == "Nadia Conti" | receiver_label == "Nadia Conti") %>%
+  filter(!is.na(timestamp))
+```
+
+```{r}
+oct8_msgs <- nadia_data %>%
+  filter(date == as.Date("2040-10-08")) %>%
+  select(timestamp, sender_label, receiver_label, content) %>%
+  arrange(timestamp)
+
+DT::datatable(
+  oct8_msgs,
+  options = list(
+    pageLength = 5,
+    autoWidth = TRUE,
+    scrollX = TRUE,
+    columnDefs = list(
+      list(
+        targets = 3,  # adjust if content is not 3rd col
+        render = JS(
+          "function(data, type, row, meta) {",
+          "return type === 'display' && data.length > 50 ?",
+          "'<span title=\"' + data + '\">' + data.substr(0, 50) + '...</span>' : data;",
+          "}"
+        )
+      )
+    )
+  ),
+  rownames = FALSE,
+  class = 'stripe hover compact',
+  caption = htmltools::tags$caption(
+    style = 'caption-side: top; text-align: left; font-size:14px; color:#444;',
+    '📌 Nadia Conti Messages on Oct 8, 2040'
+  )
+)
+```
+
+#### 7.2 Keywords of Oct 8
+
+Showing messages on Oct 8 mentioning suspicious terms of:
+
+1.  permit
+2.  approval
+3.  reef
+4.  cargo
+5.  shipment
+6.  illegal
+
+```{r}
+# Define suspicious keywords
+keywords <- c("permit", "approval", "reef", "cargo", "shipment", "dock", "illegal")
+
+# Filter messages on Oct 8 with suspicious terms
+oct8_flagged_msgs <- nadia_data %>%
+  filter(date == as.Date("2040-10-08")) %>%
+  filter(!is.na(content)) %>%
+  filter(grepl(paste(keywords, collapse = "|"), content, ignore.case = TRUE)) %>%
+  select(timestamp, sender_label, receiver_label, content) %>%
+  arrange(timestamp)
+
+# Display in interactive table
+DT::datatable(
+  oct8_flagged_msgs,
+  options = list(pageLength = 5, autoWidth = TRUE),
+  rownames = FALSE,
+  caption = htmltools::tags$caption(
+    style = 'caption-side: top; text-align: left; font-size:16px; color:#444;',
+    '📌 Oct 8 Messages with Suspicious Keywords'
+  )
+)
+```
+
+#### 7.3 Network of Oct 8 communication
+
+```{r}
+library(visNetwork)
+
+# Summarize comms on Oct 8
+oct8_edges <- nadia_data %>%
+  filter(date == as.Date("2040-10-08")) %>%
+  count(sender_label, receiver_label) %>%
+  filter(!is.na(sender_label), !is.na(receiver_label)) %>%
+  rename(from = sender_label, to = receiver_label, value = n)
+
+# Build node list
+oct8_nodes <- tibble(name = unique(c(oct8_edges$from, oct8_edges$to))) %>%
+  left_join(mc3_nodes_cleaned %>% select(label, sub_type), by = c("name" = "label")) %>%
+  mutate(
+    group = ifelse(name == "Nadia Conti", "Nadia Conti", sub_type),
+    id = name,
+    label = name
+  )
+
+# Render network
+visNetwork(oct8_nodes, oct8_edges) %>%
+  visEdges(arrows = "to") %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 456) %>%
+  visPhysics(stabilization = TRUE) %>%
+  visLegend()
+```
+
+Nadia is heavily involved in:
+
+1.  Discussion of Nemo Reef, permits, foundation work
+2.  Coordinating payments, doubling fees, Harbor Master cooperation
+3.  Adjusting schedules to avoid council suspicion
+
+**Highly suspicious tone**: manipulation, concealment, operational coordination beyond scope.
+
+### 8. Linking Oct 8 comms to permits, approvals, or vessel activity
+
+```{r}
+suspicious_events_alt <- mc3_nodes_cleaned %>%
+  filter(type == "Event", sub_type %in% c("VesselMovement", "Monitoring", "HarborReport", "Fishing", "Enforcement")) %>%
+  mutate(timestamp = ymd_hms(timestamp)) %>%
+  filter(timestamp >= as.POSIXct("2040-10-08"))
+
+DT::datatable(
+  suspicious_events_alt %>%
+    select(type, label, sub_type, id, timestamp, monitoring_type, findings),
+  options = list(
+    pageLength = 5,
+    autoWidth = TRUE,
+    scrollX = TRUE
+  ),
+  rownames = FALSE
+)
+
+```
+
+```{r}
+library(dplyr)
+library(plotly)
+
+# 1️⃣ Prepare entity-related vessel/harbor events
+entity_events <- suspicious_events_alt %>%
+  filter(str_detect(findings, regex("Neptune|Miesel|Mako", ignore_case = TRUE))) %>%
+  mutate(entity = case_when(
+    str_detect(findings, regex("Neptune", ignore_case = TRUE)) ~ "Neptune",
+    str_detect(findings, regex("Miesel", ignore_case = TRUE)) ~ "Miesel",
+    str_detect(findings, regex("Mako", ignore_case = TRUE)) ~ "Mako",
+    TRUE ~ "Other"
+  ))
+
+# 2️⃣ Build interactive plot
+plot_ly() %>%
+  # Nadia comms
+  add_markers(
+    data = nadia_data,
+    x = ~timestamp,
+    y = ~"Nadia Message",
+    marker = list(color = "red", size = 10),
+    text = ~paste0("Nadia Message<br>", timestamp),
+    hoverinfo = "text",
+    name = "Nadia Message"
+  ) %>%
+  # Neptune events
+  add_markers(
+    data = entity_events %>% filter(entity == "Neptune"),
+    x = ~timestamp,
+    y = ~entity,
+    marker = list(color = "#1f77b4", size = 10),
+    text = ~paste0(entity, " Event<br>", findings),
+    hoverinfo = "text",
+    name = "Neptune Event"
+  ) %>%
+  # Miesel events
+  add_markers(
+    data = entity_events %>% filter(entity == "Miesel"),
+    x = ~timestamp,
+    y = ~entity,
+    marker = list(color = "#17becf", size = 10),
+    text = ~paste0(entity, " Event<br>", findings),
+    hoverinfo = "text",
+    name = "Miesel Event"
+  ) %>%
+  # Mako events
+  add_markers(
+    data = entity_events %>% filter(entity == "Mako"),
+    x = ~timestamp,
+    y = ~entity,
+    marker = list(color = "#7f7f7f", size = 10),
+    text = ~paste0(entity, " Event<br>", findings),
+    hoverinfo = "text",
+    name = "Mako Event"
+  ) %>%
+  layout(
+    title = "Nadia Comms + Vessel/Harbor Events",
+    xaxis = list(title = "Time"),
+    yaxis = list(title = ""),
+    legend = list(orientation = "h", x = 0.1, y = -0.3)
+  )
+```
+
+The interactive timeline highlights that Nadia Conti’s communications were closely followed by vessel/harbor events involving Neptune, V. Miesel Shipping, and Mako. Notably:
+
+```         
+•   On **Oct 8**, Nadia’s messages spiked, coinciding with planned operations at Nemo Reef.
+
+•   Shortly afterward, vessel activities linked to **Neptune, Miesel, and Mako** were logged.
+
+•   This temporal proximity strongly suggests coordination between Nadia and these entities.
+```
+
+There is no evidence of formal approvals or permits linked to these activities, pointing to potential covert operations.
+
+## Question 4B - Are Clepper’s suspicions justified?
+
+### 1. Findings
+
+**1.1 Communication Activity**
+
+-   Nadia exchanged a total of **26 messages**, of which **31% were sent** and **69% received**.
+
+-   An unusually high volume of messages was recorded on **2040-10-08** (9 messages), exceeding the normal daily message count and crossing the defined spike threshold.
+
+-   Messaging patterns were concentrated between **08:00 and 12:00**, suggesting focused coordination during operational hours.
+
+**1.2 Relationship Network**
+
+-   Network visualizations indicate Nadia as a central figure in communications with key individuals (Davis, Liam Thorne, Elise) and entities (Neptune, Marlin, V. Miesel Shipping).
+
+-   The strongest links were observed between Nadia and Davis, Neptune, and Liam Thorne, with frequent exchanges regarding sensitive operational matters.
+
+**1.3 Content of Communication**
+
+-   Thematic analysis identified frequent mentions of **permits, approvals, reef, foundation work, shipment, and cargo**.
+
+-   Several messages contained concerning elements, including discussions of doubling fees for cooperation, adjustments to patrol schedules, and concealing operations from the council.
+
+**1.4 Temporal and Event Alignment**
+
+-   Timeline analysis shows that Nadia’s communication spikes closely preceded vessel activities involving **Neptune, V. Miesel Shipping, and Mako**.
+
+-   This temporal alignment strongly suggests a coordinated effort linked to unauthorized operations at Nemo Reef.
+
+### Conclusion
+
+The evidence **supports Clepper’s suspicions**. Nadia’s communication patterns, network centrality, message content, and the alignment with vessel activity point to her active involvement in potentially covert and unauthorized operations. There is no indication of formal approvals associated with these activities, raising further concerns about compliance and legality.
