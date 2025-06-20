@@ -35,12 +35,22 @@ website:
             href: Hands-on_Ex/Hands-on_Ex05/Hands-on_Ex05.qmd
           - text: "Exercise 6"
             href: Hands-on_Ex/Hands-on_Ex06/Hands-on_Ex06.qmd
-          - text: "Exercise 7A"
+          - text: "Exercise 8A"
             href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_1.qmd
-          - text: "Exercise 7B"
+          - text: "Exercise 8B"
             href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_2.qmd
-          - text: "Exercise 7C"
-            href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_3.qmd                
+          - text: "Exercise 8C"
+            href: Hands-on_Ex/Hands-on_Ex07/Hands-on_Ex07_3.qmd
+          - text: "Exercise 9A"
+            href: Hands-on_Ex/Hands-on_Ex08/Hands-on_Ex09a.html
+          - text: "Exercise 9B"
+            href: Hands-on_Ex/Hands-on_Ex08/Hands-on_Ex09b.html
+          - text: "Exercise 9C"
+            href: Hands-on_Ex/Hands-on_Ex08/Hands-on_Ex09c.html   
+          - text: "Exercise 9D"
+            href: Hands-on_Ex/Hands-on_Ex08/Hands-on_Ex09d.html
+          - text: "Exercise 9E"
+            href: Hands-on_Ex/Hands-on_Ex08/Hands-on_Ex09e.html     
       - section: "Take-Home Exercise"
         contents:
           - text: "Take-Home Ex01 A"

@@ -2806,10 +2806,12 @@ plot_ly() %>%
 
 The interactive timeline highlights that Nadia Conti’s communications were closely followed by vessel/harbor events involving Neptune, V. Miesel Shipping, and Mako. Notably:
 
-	•	On **Oct 8**, Nadia’s messages spiked, coinciding with planned operations at Nemo Reef.
+```         
+•   On **Oct 8**, Nadia’s messages spiked, coinciding with planned operations at Nemo Reef.
 
-	•	Shortly afterward, vessel activities linked to **Neptune, Miesel, and Mako** were logged.
+•   Shortly afterward, vessel activities linked to **Neptune, Miesel, and Mako** were logged.
 
-	•	This temporal proximity strongly suggests coordination between Nadia and these entities.
+•   This temporal proximity strongly suggests coordination between Nadia and these entities.
+```
 
 There is no evidence of formal approvals or permits linked to these activities, pointing to potential covert operations.
