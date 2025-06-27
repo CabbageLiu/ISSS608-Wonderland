@@ -50,7 +50,9 @@ website:
           - text: "Exercise 9D"
             href: Hands-on_Ex/Hands-on_Ex08/Hands-on_Ex09d.html
           - text: "Exercise 9E"
-            href: Hands-on_Ex/Hands-on_Ex08/Hands-on_Ex09e.html     
+            href: Hands-on_Ex/Hands-on_Ex08/Hands-on_Ex09e.html
+          - text: "Exercise 10"
+            href: Hands-on_Ex/Hands-on_Ex10/Hands-on_Ex10.html                 
       - section: "Take-Home Exercise"
         contents:
           - text: "Take-Home Ex01 A"
