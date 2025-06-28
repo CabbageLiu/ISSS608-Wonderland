@@ -67,6 +67,8 @@ website:
         contents:
           - text: "Week 5 In Class Exercise"
             href: MC1/MC1_InClass.qmd
+          - text: "Week 10 In Class Exercise"
+            href: In_class_EX10/In_class_EX10.qmd            
       - section: "Testing Section"
         contents:
           - text: "For project"
